@@ -2,24 +2,22 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from model.utils import balance_kmeans_cluster
+from utils import balance_kmeans_cluster
 
-class ClusterTree(nn.Module):
-    def __init__(self, devices, depth, max_depth):
-        super(ClusterTree, self).__init__()
+class DeviceClusterTree(nn.Module):
+    def __init__(self,num_input, devices, depth, max_depth):
+        super(DeviceClusterTree, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
         
         self.devices = devices
-        # 5 weights for task and 4 for each device
-        num_features = 5 + 4 * len(devices)
         
         self.exploration_rate=0.5
         self.explore_decay=0.99
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(
-                num_features).normal_(mean=0, std=0.1))
+                num_input).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
             self.alpha = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
@@ -29,8 +27,8 @@ class ClusterTree(nn.Module):
             clusters = balance_kmeans_cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = ClusterTree(left_cluster, depth+1, max_depth)
-            self.right = ClusterTree(right_cluster, depth+1, max_depth)
+            self.left = DeviceClusterTree(left_cluster, depth+1, max_depth)
+            self.right = DeviceClusterTree(right_cluster, depth+1, max_depth)
 
     def forward(self, x,path=""):
         if self.depth == self.max_depth:

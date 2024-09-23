@@ -2,10 +2,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from model.utils import balance_kmeans_cluster
+from utils import balance_kmeans_cluster
 
 class ClusTree(nn.Module):
-    def __init__(self, devices, depth, max_depth,num_epoch, counter=0):
+    def __init__(self,num_input,devices, depth, max_depth,num_epoch,counter=0, exploration_rate=0):
         super(ClusTree, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
@@ -19,9 +19,8 @@ class ClusTree(nn.Module):
         self.counter = counter
 
         self.devices = devices
-        num_features = 8
         if depth != max_depth:
-            self.weights = nn.Parameter(torch.empty(num_features).normal_(mean=0, std=0.1))
+            self.weights = nn.Parameter(torch.empty(num_input,).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
             self.prob_dist = nn.Parameter(torch.ones(len(devices)))
@@ -30,8 +29,8 @@ class ClusTree(nn.Module):
             clusters = balance_kmeans_cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = ClusTree(left_cluster, depth+1, max_depth)
-            self.right = ClusTree(right_cluster, depth+1, max_depth)
+            self.left = ClusTree(left_cluster, depth+1, max_depth,self.counter,self.exploration_rate)
+            self.right = ClusTree(right_cluster, depth+1, max_depth,self.counter,self.exploration_rate)
 
     def forward(self, x, path=""):
         if self.depth == self.max_depth:

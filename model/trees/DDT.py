@@ -4,11 +4,12 @@ import torch.nn as nn
 from data.db import Database
 
 class DDT(nn.Module):
-    def __init__(self, num_input, num_output, depth, max_depth, num_epoch=len(Database().get_all_jobs()), counter=0, exploration_rate=0):
+    def __init__(self, num_input, num_output, depth, max_depth, counter=0, exploration_rate=0):
         super(DDT, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
         self.epsilon = 1e-5
+        num_epoch=len(Database().get_all_jobs())
         
         self.exp_mid_bound = num_epoch * self.epsilon
         self.exploration_rate = self.exp_mid_bound + (self.exp_mid_bound / 2)

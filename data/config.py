@@ -56,7 +56,7 @@ devices_config = {
 }
 
 jobs_config = {
-    "num_jobs": 10000,
+    "num_jobs": 100,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 2,
@@ -73,8 +73,55 @@ jobs_config = {
 
 
 learning_config={
-    "rewardSetup":1,
-    "punish":1,
+    "tree":"ddt", # ddt
+    """
+        ddt :  ddt 
+        device-ddt :  ddt + pe features
+        soft-ddt :  soft tree
+        clustree : clustree 
+        device-clustree : clustree + pe features
+    """
+    
+    "subtree":"forest", # choosing core & dvfs from a forst of trees (a tree per device)
+    "subtree":"first-choice", # choosing first availiable core and the first dvfs
+    
+    
+    
+    "rewardSetup":5, 
+    """
+        1 : -1 * (alpha * e + beta * t)
+        2 : 1 / (alpha * e + beta * t)
+        3 : -np.exp(alpha * e) - np.exp(beta * t)
+        4 : -np.exp(alpha * e + beta * t)
+        5 : np.exp(-1 * (alpha * e + beta * t))
+        6 : -np.log(alpha * e + beta * t)
+        7 : -((alpha * e + beta * t) ** 2)
+    """
+    "alpha":1, # energy coffeicent in the reware
+    "beta":1, # time coffeicent in the reware
+    "increasing_punish":True,
+    "punish":1, 
     "init_punish":-10,
-    "result_path":'./mmd.csv',
+    
+    "should explore":True,
+    
+    
+    "tree_max_depth":3,
+    
+
+ 
+    "onehot-kind":True,   # onehotting the task kind
+    "regulrize_input":True, # regulirze the task/device features to feed the tree
+    "regulrize_output":True,  # regulirze t,e for the reward
+    
+    
+    "learning_algorithm":"ppo",
+    "learning_algorithm":"a2c",
+    "learning_algorithm":"ploicy-grad",
+    "discount_factor":0.99, # 0: reward , 0.99:return
+    
+    "result_summery_path":'./results/summery.csv',
+    "result_plot_path":'./results/result.png',
+    
+    
 }

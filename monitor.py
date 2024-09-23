@@ -4,7 +4,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from config import learning_config
+from data.config import learning_config
 from data.db import Database
 
 class Monitor():
@@ -71,14 +71,14 @@ class Monitor():
         new_epoch_data_list = [new_epoch_data]
 
         df = None
-        if os.path.exists(learning_config['result_path']):
-            df = pd.read_csv(learning_config['result_path'])
+        if os.path.exists(learning_config['result_summery_path']):
+            df = pd.read_csv(learning_config['result_summery_path'])
             new_df = pd.DataFrame(new_epoch_data_list)
             df = pd.concat([df, new_df], ignore_index=True)
         else:
             df = pd.DataFrame(new_epoch_data_list)
 
-        df.to_csv(learning_config['result_path'], index=False)
+        df.to_csv(learning_config['result_summery_path'], index=False)
 
 
     def plot_histories(self,punish=0, epsilon=0, init_explore_rate=0, explore_rate=0, exp_counter=0):
@@ -175,7 +175,7 @@ class Monitor():
         axs[2, 1].set_ylabel('Epochs')
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig(f"./results/mmd.png")
+        plt.savefig(learning_config['result_plot_path'])
 
 
 

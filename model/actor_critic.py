@@ -2,32 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-import torch.optim as optim
 
-from model.trees.DDT import DDT
+from data.config import learning_config
+from model.utils import get_tree, get_critic
 
-
-# Main Actor-Critic class, combining both the Actor and Critic networks
 class ActorCritic(nn.Module):
-    def __init__(self, input_dim, output_dim, tree_max_depth, critic_input_dim, critic_hidden_layer_dim, discount_factor):
+    def __init__(self):
         super(ActorCritic, self).__init__()
-        self.input_dim =input_dim
-        self.output_dim =output_dim
-        self.tree_max_depth =tree_max_depth
-        self.critic_input_dim =critic_input_dim
-        self.critic_hidden_layer_dim =critic_hidden_layer_dim
-          
-        self.discount_factor = discount_factor
-        self.actor = DDT(input_dim, output_dim, 0, tree_max_depth)  # Decision tree-like actor
-        self.critic = nn.Sequential(
-            nn.Linear(critic_input_dim, critic_hidden_layer_dim),
-            nn.ReLU(),
-            nn.Linear( critic_hidden_layer_dim, critic_hidden_layer_dim),
-            nn.ReLU(),
-            nn.Linear(critic_hidden_layer_dim, 1)  # Output single value for value estimation
-        )
-
-        # Initialize memory for storing the experiences
+        self.discount_factor = learning_config['discount_factor']
+        self.actor = get_tree()
+        self.critic = get_critic()  # Critic could be None
         self.reset_memory()
 
     # Store experiences in memory
@@ -40,10 +24,10 @@ class ActorCritic(nn.Module):
     def reset_memory(self):
         self.rewards, self.actions, self.states, self.pis = [], [], [], []
 
-    # Forward pass through both actor and critic
+    # Forward pass through both actor and critic (if present)
     def forward(self, x):
         p, path = self.actor(x)  # Policy distribution from the actor
-        v = self.critic(x)  # Value estimate from the critic
+        v = self.critic(x) if self.critic is not None else None  # Value estimate from the critic, if applicable
         return p, path, v
 
     # Select action based on actor's policy
@@ -75,9 +59,6 @@ class ActorCritic(nn.Module):
         actions = torch.tensor(self.actions, dtype=torch.float)
         returns = self.calculate_returns()
 
-        # Get value estimates for all states
-        values = torch.stack([self.critic(state) for state in states], dim=0).squeeze()
-
         # Stack stored policy distributions
         pis = torch.stack(self.pis, dim=0)
         probs = F.softmax(pis, dim=-1)
@@ -86,9 +67,22 @@ class ActorCritic(nn.Module):
         # Log probabilities of the actions taken
         log_probs = dist.log_prob(actions)
 
-        # Actor loss (policy gradient) and critic loss (value estimation)
-        actor_loss = -torch.sum(log_probs * (returns-values))
-        critic_loss = F.mse_loss(values, returns)
+        # Actor loss (policy gradient)
+        actor_loss = -torch.sum(log_probs * (returns))
 
-        # Total loss = actor loss + critic loss
-        return actor_loss +critic_loss
+        # If there is a critic, calculate the critic loss
+        if self.critic is not None:
+            # Get value estimates for all states
+            values = torch.stack([self.critic(state) for state in states], dim=0).squeeze()
+
+            # Actor loss (policy gradient) with baseline
+            actor_loss = -torch.sum(log_probs * (returns - values))
+
+            # Critic loss (value estimation)
+            critic_loss = F.mse_loss(values, returns)
+            
+            # Total loss = actor loss + critic loss
+            return actor_loss + critic_loss
+        else:
+            # Only actor loss if there is no critic
+            return actor_loss

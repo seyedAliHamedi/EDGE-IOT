@@ -1,4 +1,3 @@
-from data.gen import Generator
 from env import Environment
 
 

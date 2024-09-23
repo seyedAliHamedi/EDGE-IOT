@@ -17,9 +17,7 @@ class Environment():
         self.tasks=Database().get_all_tasks()
         
         
-        self.actor_critic =ActorCritic(input_dim=8 , output_dim=len(self.devices),
-                                          tree_max_depth=3, critic_input_dim=8 ,
-                                          critic_hidden_layer_dim=128, discount_factor=0.99)
+        self.actor_critic =ActorCritic()
         self.optimizer = optim.Adam(self.actor_critic.parameters(),lr=0.005)
         
         self.monitor = Monitor()
@@ -28,10 +26,9 @@ class Environment():
     def execute_action(self, pe_ID, core_i, freq, volt, task_ID):
         pe = Database().get_device(pe_ID)
         task = Database().get_task(task_ID)
-        t = np.ceil(task["computational_load"] / freq)
 
 
-        fail_flags = [0, 0, 0, 0]
+        fail_flags = [0, 0]
         if task["is_safe"] and not pe['handleSafeTask']:
             # fail : assigned safe task to unsafe device
             fail_flags[0] = 1
@@ -42,10 +39,15 @@ class Environment():
         if sum(fail_flags) > 0:
             return sum(fail_flags) * reward_function(punish=True), 0,0, fail_flags[1], fail_flags[0]
 
-
-        capacitance = pe["capacitance"][core_i]
-        e = capacitance * (volt * volt) * freq * t
-        return reward_function(t=t , e=e), t,e, fail_flags[1], fail_flags[0]
+        
+        total_t, total_e  = calc_total(pe, task, core_i,0)
+        reg_e = total_e
+        reg_t = total_t
+        # if self.shouldRegular:
+            # reg_t = regularize_any(total_t, 1)
+            # reg_e = regularize_any(total_e, 2)
+        return reward_function(t=reg_t , e=reg_e), reg_t,reg_e, fail_flags[1], fail_flags[0]
+    
 
     def run(self):
         for job_id in range(len(self.jobs)):
@@ -76,6 +78,7 @@ class Environment():
                 
             loss_job=self.actor_critic.calc_loss()
             self.monitor.update(time_job,energy_job,reward_job,loss_job,fail_job,usage_job,len(tasks),path_job)
+            
             self.optimizer.zero_grad()
             loss_job.backward()
             self.optimizer.step()

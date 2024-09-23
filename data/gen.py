@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import ast
-from config import devices_config,jobs_config
+from data.config import devices_config,jobs_config
 
 class Generator:
     _task_id_counter = 0

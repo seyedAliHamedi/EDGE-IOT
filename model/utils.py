@@ -1,79 +1,67 @@
-import numpy as np
-import pandas as pd
-from typing import Counter
-from sklearn.cluster import KMeans
 
+import torch
+import torch.nn as nn
 
-def balance_kmeans_cluster(devices, k=2):
-        data = [get_pe_data(device) for _, device in devices.iterrows()]
-
-        if len(devices) < k + 1:
-            return [devices] * k
-        X = np.array(data)
-        kmeans = KMeans(n_clusters=k, init="random", random_state=42)
-        kmeans.fit(X)
-
-        cluster_labels = kmeans.labels_
-        clusters = [devices.iloc[[]].copy() for _ in range(k)]
-
-        # Balance the clusters
-        balanced_labels = balance_clusters(cluster_labels, k, len(devices))
-
-        for (index, device), label in zip(devices.iterrows(), balanced_labels):
-            clusters[label] = pd.concat([clusters[label], device.to_frame().T], ignore_index=True)
-        return clusters
-
-def get_pe_data(pe):
-        capacitance = sum(pe['capacitance'])
-        handleSafeTask = pe['handleSafeTask']
-        kind = sum(pe['acceptableTasks'])
-
-        if pe['id'] != "cloud":
-            devicePower = 0
-            for index, core in enumerate(pe["voltages_frequencies"]):
-                corePower = 0
-                for mod in core:
-                    freq, vol = mod
-                    corePower += freq / vol
-                devicePower += corePower
-            devicePower = devicePower / pe['number_of_cpu_cores']
-        else:
-            devicePower = 1e9
-
-        return [devicePower, capacitance, handleSafeTask, kind]
-
-def balance_clusters(labels, k, n_samples):
-        """
-        Adjusts the initial cluster assignments to ensure clusters are balanced.
-        """
-        target_cluster_size = n_samples // k
-        max_imbalance = n_samples % k  # Allowable imbalance due to indivisible n_samples
+from data.db import Database
+from model.trees.ClusTree import ClusTree
+from model.trees.DDT import DDT
+from model.trees.DeviceClusTree import DeviceClusterTree
+from model.trees.SoftDDT import SoftDDT
         
-        cluster_sizes = Counter(labels)
-        
-        # List to store the indices of samples in each cluster
-        cluster_indices = {i: [] for i in range(k)}
-        
-        # Populate the cluster_indices dictionary
-        for idx, label in enumerate(labels):
-            cluster_indices[label].append(idx)
+from data.config import learning_config
+
+def get_tree():
+    tree = learning_config['tree']
+    devices = Database().get_all_devices()
+    max_depth = learning_config['tree_max_depth']
+    if tree == "ddt":
+        return DDT(num_input=get_num_input(devices=False),num_output=len(devices),depth=0,max_depth=max_depth)
+    elif tree == "device-ddt":
+        return DDT(num_input=get_num_input(devices=True),num_output=len(devices),depth=0,max_depth=max_depth)
+    elif tree == "soft-ddt":
+        return SoftDDT(num_input=get_num_input(devices=False),num_output=len(devices),depth=0,max_depth=max_depth)
+    elif tree == "soft-device-ddt":
+        return SoftDDT(num_input=get_num_input(devices=True),num_output=len(devices),depth=0,max_depth=max_depth)
+    elif tree == "clustree":
+        return ClusTree(num_input=get_num_input(devices=False),devices=devices,depth=0,max_depth=max_depth)
+    elif tree == "device-clustree":
+        return DeviceClusterTree(num_input=get_num_input(devices=True),devices=devices,depth=0,max_depth=max_depth)
 
 
-        # Reassign samples to achieve balanced clusters
-        for cluster in range(k):
-            while len(cluster_indices[cluster]) > target_cluster_size:
-                for target_cluster in range(k):
-                    if len(cluster_indices[target_cluster]) < target_cluster_size:
-                        sample_to_move = cluster_indices[cluster].pop()
-                        labels[sample_to_move] = target_cluster
-                        cluster_indices[target_cluster].append(sample_to_move)
-                        # Exit early if target sizes are met with allowable imbalance
-                        if _clusters_balanced(cluster_indices, target_cluster_size, max_imbalance):
-                            return labels
-                        break
-
-        return labels
+def get_num_input(devices):
+    if devices:
+        pe_feature = learning_config['pe_num_features'] * len(devices)
+        num_input = 5 + pe_feature
+        if learning_config['onehot-kind']:
+            num_input = 8  + pe_feature
+        return num_input
+    else:
+        num_input = 5
+        if learning_config['onehot-kind']:
+            num_input = 8
+        return num_input
     
-def _clusters_balanced(cluster_indices, target_size, max_imbalance):
-        imbalance_count = sum(abs(len(indices) - target_size) for indices in cluster_indices.values())
-        return imbalance_count <= max_imbalance
+def get_critic():
+    tree = learning_config['tree']
+    num_input =get_num_input(devices=False)
+    if tree in ("device-clustree","soft-device-ddt","device-ddt"):
+        num_input =get_num_input(devices=True)
+        
+    if learning_config["learning_algorithm"] == "ppo" or learning_config["learning_algorithm"] == "a2c" :
+        num_hidden_layers = learning_config['critic_hidden_layer_num']
+        critic_hidden_layer_dim = learning_config['critic_hidden_layer_dim']
+        # Create list of layers
+        layers = [nn.Linear(num_input, critic_hidden_layer_dim), nn.ReLU()]
+
+        # Append hidden layers dynamically
+        for _ in range(num_hidden_layers):
+            layers.append(nn.Linear(critic_hidden_layer_dim, critic_hidden_layer_dim))
+            layers.append(nn.ReLU())
+
+        # Final output layer
+        layers.append(nn.Linear(critic_hidden_layer_dim, 1))
+
+        return  nn.Sequential(*layers)
+    else:
+        return None
+        

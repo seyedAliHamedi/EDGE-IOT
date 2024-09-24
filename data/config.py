@@ -56,10 +56,10 @@ devices_config = {
 }
 
 jobs_config = {
-    "num_jobs": 1000,
+    "num_jobs": 10000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
-    "max_depth": 2,
+    "max_depth": 5,
     "task": {
         # input_size ,output_size ,computational_load in MB --> * 10^6
         "input_size": [1, 1001],
@@ -73,7 +73,9 @@ jobs_config = {
 
 
 learning_config={
-    "tree":"soft-ddt", # ddt
+    
+    ###### TREE #######
+    "tree":"ddt", # ddt
     
     #    ddt :  ddt 
     #    device-ddt :  ddt + pe features
@@ -82,6 +84,9 @@ learning_config={
     #    clustree : clustree 
     #    device-clustree : clustree + pe features
     
+    "tree_max_depth":3,
+    
+    ###### REWARD,ALPHA,BETA #######
     "rewardSetup":5, 
        
     #   1 : -1 * (alpha * e + beta * t)
@@ -95,33 +100,39 @@ learning_config={
     "alpha":1, # energy coffeicent in the reware
     "beta":1, # time coffeicent in the reware
     
+    ###### PUNISH #######
     "increasing_punish":True,
     "init_punish":-10,
     "punish_epsilon":-0.001,
     
+    ###### EXPLORE #######
     "should_explore":True,
     "explore_epsilon":True,
-    "num_jobs":1000,
+    "num_jobs":10000,
     
-    "tree_max_depth":3,
-
- 
+    ###### INPUT & OUTPUT #######
     "onehot_kind":True,   # onehotting the task kind
     "regulrize_input":True, # regulirze the task/device features to feed the tree
     "regulrize_output":True,  # regulirze t,e for the reward
-    
-    
     'pe_num_features':2,
     
+    ###### ALGORITHM #######
     
     
-    "learning_algorithm":"ppo",
-    "learning_algorithm":"a2c",
     "learning_algorithm":"ploicy-grad",
-    "discount_factor":0.99, # 0: reward , 0.99:return
+    #   policy-grad
+    #   a2c
+    #   ppo
     
+    "ppo_epsilon":0.2,
+    
+    "critic_hidden_layer_num":1,
+    "critic_hidden_layer_dim":128,
+    
+    "discount_factor":0, # 0: reward , 0.99:return
+    
+    
+    ###### PATHS #######
     "result_summery_path":'./results/summery.csv',
     "result_plot_path":'./results/result.png',
-    
-    
 }

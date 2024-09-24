@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 from data.config import learning_config
+from data.db import Database
 from model.trees.ClusTree import ClusTree
 from model.trees.DeviceClusTree import DeviceClusterTree
 from model.utils import get_tree, get_critic
@@ -14,7 +15,9 @@ class ActorCritic(nn.Module):
         self.discount_factor = learning_config['discount_factor']
         self.actor = get_tree()  # Initialize actor
         self.critic = get_critic()  # Critic could be None
+        
         self.reset_memory()
+        self.old_log_probs = {i: None for i in range(len(Database().get_all_devices()))} 
 
     # Store experiences in memory
     def archive(self, state, action, reward):
@@ -49,7 +52,7 @@ class ActorCritic(nn.Module):
         probs = F.softmax(pi, dim=-1)
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
-
+        
         return action.item(), path, devices  # Return sampled action, the path, and devices
 
     # Calculate the discounted returns from the stored rewards
@@ -65,7 +68,7 @@ class ActorCritic(nn.Module):
     # Compute the actor-critic loss
     def calc_loss(self):
         states = torch.tensor(self.states, dtype=torch.float)
-        actions = torch.tensor(self.actions, dtype=torch.float)
+        actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
 
         # Stack stored policy distributions
@@ -74,24 +77,48 @@ class ActorCritic(nn.Module):
         dist = Categorical(probs)
 
         # Log probabilities of the actions taken
-        log_probs = dist.log_prob(actions)
+        new_log_probs = dist.log_prob(actions)
+        
 
-        # Actor loss (policy gradient)
-        actor_loss = -torch.sum(log_probs * (returns))
 
-        # If there is a critic, calculate the critic loss
+        
+        # Calculate advantages
         if self.critic is not None:
-            # Get value estimates for all states
             values = torch.stack([self.critic(state) for state in states], dim=0).squeeze()
-
-            # Actor loss (policy gradient) with baseline
-            actor_loss = -torch.sum(log_probs * (returns - values))
-
-            # Critic loss (value estimation)
-            critic_loss = F.mse_loss(values, returns)
-            
-            # Total loss = actor loss + critic loss
-            return actor_loss + critic_loss
+            advantages = returns - values.detach()  # Using detach to avoid gradient flow
         else:
-            # Only actor loss if there is no critic
-            return actor_loss
+            advantages = returns
+        
+        if learning_config['learning_algorithm']=="ppo":
+            # PPO objective
+            
+            # get log probs for the first time (no difference between old and new here)
+            for i, action in enumerate(actions):
+                if self.old_log_probs[action.item()] is None:
+                    self.old_log_probs[action.item()] = Categorical(probs[i]).log_prob(action).item()
+                    
+            # collect the correspanding old log probs
+            old_log_probs = []
+            for action in actions:
+                old_log_probs.append(self.old_log_probs[action.item()])
+            old_log_probs =torch.tensor(old_log_probs)
+            
+            ratio = torch.exp(new_log_probs - old_log_probs)  # Importance ratio
+            
+            # update log probs
+            for i, action in enumerate(actions):
+                self.old_log_probs[action.item()] = Categorical(probs[i]).log_prob(action).item()
+            
+            p1 = ratio * advantages
+            p2 = torch.clamp(ratio, 1 - learning_config['ppo_epsilon'], 1 + learning_config['ppo_epsilon']) * advantages
+
+            actor_loss = -torch.min(p1, p2).mean()  # Minimize the clipped objective
+        else:
+            actor_loss = -torch.sum(new_log_probs*advantages)
+            
+        critic_loss = 0
+        if self.critic:
+            critic_loss = F.mse_loss(values, returns)
+
+
+        return actor_loss + critic_loss

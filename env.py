@@ -1,3 +1,5 @@
+
+import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,6 +11,7 @@ from data.db import Database
 from model.actor_critic import ActorCritic
 from monitor import Monitor
 from utils import *
+torch.autograd.set_detect_anomaly(True)
 
 class Environment():
     def __init__(self):
@@ -50,9 +53,13 @@ class Environment():
     
 
     def run(self):
+        starting_time = time.time()
         for job_id in range(len(self.jobs)):
+            if ((job_id / len(self.jobs))*100)%10==0:
+                print(f"{((job_id / len(self.jobs))*100)}% done in {int(time.time()-starting_time)} seconds")
             time_job = energy_job = reward_job = loss_job = 0
-            fail_job = usage_job = np.array([0,0,0])
+            fail_job = np.array([0,0,0])
+            usage_job = np.array([0,0,0])
             path_job = []
 
             tasks = Database().get_job(job_id)["tasks_ID"]
@@ -64,9 +71,9 @@ class Environment():
                 selected_device_index = action
                 if devices:
                     selected_device_index = self.devices.index(devices[selected_device_index])
-                    
+                selected_device = self.devices[selected_device_index]    
                 core_index = 0
-                (freq,vol) = self.devices[selected_device_index]['voltages_frequencies'][core_index][0]
+                (freq,vol) = selected_device['voltages_frequencies'][core_index][0]
                 reward, t, e, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,core_i=core_index,freq=freq,volt=vol,task_ID=task_id)
                 
                 
@@ -74,12 +81,17 @@ class Environment():
                 self.actor_critic.archive(input_state, action, reward)
                 
                 
-                
                 reward_job += reward
                 time_job += t
                 energy_job += e
                 fails = np.array([taskFail + safeFail, taskFail, safeFail])
                 fail_job += fails
+                if selected_device['type']=='iot':
+                    usage_job[0] +=1
+                if selected_device['type']=='mec':
+                    usage_job[1] +=1
+                if selected_device['type']=='cloud':
+                    usage_job[2] +=1
                 path_job.append(path)
                 
             loss_job=self.actor_critic.calc_loss()

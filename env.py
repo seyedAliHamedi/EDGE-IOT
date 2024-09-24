@@ -1,35 +1,35 @@
-
 import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import torch 
+import torch
 import torch.optim as optim
 
 from data.db import Database
 from model.actor_critic import ActorCritic
 from monitor import Monitor
 from utils import *
+
 torch.autograd.set_detect_anomaly(True)
+
 
 class Environment():
     def __init__(self):
-        self.devices=Database().get_all_devices()
-        self.jobs=Database().get_all_jobs()
-        self.tasks=Database().get_all_tasks()
-        
-        
-        self.actor_critic =ActorCritic()
-        self.optimizer = optim.Adam(self.actor_critic.parameters(),lr=0.005)
-        
+        self.devices = Database().get_all_devices()
+        self.jobs = Database().get_all_jobs()
+        self.tasks = Database().get_all_tasks()
+
+        self.actor_critic = ActorCritic()
+        self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
+
         self.monitor = Monitor()
-        
-        ##### Functionality
+
+    ##### Functionality
+
     def execute_action(self, pe_ID, core_i, freq, volt, task_ID):
         pe = Database().get_device(pe_ID)
         task = Database().get_task(task_ID)
-
 
         fail_flags = [0, 0]
         if task["is_safe"] and not pe['handleSafeTask']:
@@ -40,26 +40,24 @@ class Environment():
             fail_flags[1] = 1
 
         if sum(fail_flags) > 0:
-            return sum(fail_flags) * reward_function(punish=True), 0,0, fail_flags[1], fail_flags[0]
+            return sum(fail_flags) * reward_function(punish=True), 0, 0, fail_flags[1], fail_flags[0]
 
-        
-        total_t, total_e  = calc_total(pe, task, core_i,0)
+        total_t, total_e = calc_total(pe, task, core_i, 0)
         reg_e = total_e
         reg_t = total_t
         # if self.shouldRegular:
-            # reg_t = regularize_any(total_t, 1)
-            # reg_e = regularize_any(total_e, 2)
-        return reward_function(t=reg_t , e=reg_e), reg_t,reg_e, fail_flags[1], fail_flags[0]
-    
+        # reg_t = regularize_any(total_t, 1)
+        # reg_e = regularize_any(total_e, 2)
+        return reward_function(t=reg_t, e=reg_e), reg_t, reg_e, fail_flags[1], fail_flags[0]
 
     def run(self):
         starting_time = time.time()
         for job_id in range(len(self.jobs)):
-            if ((job_id / len(self.jobs))*100)%10==0:
-                print(f"{((job_id / len(self.jobs))*100)}% done in {int(time.time()-starting_time)} seconds")
+            if ((job_id / len(self.jobs)) * 100) % 10 == 0:
+                print(f"{((job_id / len(self.jobs)) * 100)}% done in {int(time.time() - starting_time)} seconds")
             time_job = energy_job = reward_job = loss_job = 0
-            fail_job = np.array([0,0,0])
-            usage_job = np.array([0,0,0])
+            fail_job = np.array([0, 0, 0])
+            usage_job = np.array([0, 0, 0])
             path_job = []
 
             tasks = Database().get_job(job_id)["tasks_ID"]
@@ -67,44 +65,39 @@ class Environment():
                 current_task = Database().get_task_norm(task_id)
                 input_state = get_input(current_task)
 
-                action, path ,devices= self.actor_critic.choose_action(input_state)
+                action, path, devices = self.actor_critic.choose_action(input_state)
                 selected_device_index = action
                 if devices:
                     selected_device_index = self.devices.index(devices[selected_device_index])
-                selected_device = self.devices[selected_device_index]    
+                selected_device = self.devices[selected_device_index]
                 core_index = 0
-                (freq,vol) = selected_device['voltages_frequencies'][core_index][0]
-                reward, t, e, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,core_i=core_index,freq=freq,volt=vol,task_ID=task_id)
-                
-                
-                
+                (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
+                reward, t, e, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index, core_i=core_index,
+                                                                       freq=freq, volt=vol, task_ID=task_id)
+
                 self.actor_critic.archive(input_state, action, reward)
-                
-                
+
                 reward_job += reward
                 time_job += t
                 energy_job += e
                 fails = np.array([taskFail + safeFail, taskFail, safeFail])
                 fail_job += fails
-                if selected_device['type']=='iot':
-                    usage_job[0] +=1
-                if selected_device['type']=='mec':
-                    usage_job[1] +=1
-                if selected_device['type']=='cloud':
-                    usage_job[2] +=1
+                if selected_device['type'] == 'iot':
+                    usage_job[0] += 1
+                if selected_device['type'] == 'mec':
+                    usage_job[1] += 1
+                if selected_device['type'] == 'cloud':
+                    usage_job[2] += 1
                 path_job.append(path)
-                
-            loss_job=self.actor_critic.calc_loss()
-            self.monitor.update(time_job,energy_job,reward_job,loss_job,fail_job,usage_job,len(tasks),path_job)
-            
+
+            loss_job = self.actor_critic.calc_loss()
+            self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(tasks), path_job)
+
             self.optimizer.zero_grad()
             loss_job.backward()
             self.optimizer.step()
-            loss_job=self.actor_critic.reset_memory()
-            
+            loss_job = self.actor_critic.reset_memory()
+
         self.monitor.save_results()
         self.monitor.plot_histories()
         print("COMPLETED")
-        
-    
-   

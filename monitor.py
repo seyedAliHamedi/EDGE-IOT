@@ -28,7 +28,7 @@ class Monitor():
 
         new_epoch_data = {
             "Setup": learning_config['rewardSetup'],
-            "Punishment": learning_config['punish'],
+            "Punishment": learning_config['init_punish'],
 
             "Average Loss":  sum(self.avg_loss_history)/num_epoch,
             "Last Epoch Loss": self.avg_loss_history[-1],

@@ -73,43 +73,35 @@ jobs_config = {
 
 
 learning_config={
-    "tree":"clustree", # ddt
-    """
-        ddt :  ddt 
-        device-ddt :  ddt + pe features
-        soft-ddt :  soft tree
-        soft-device-ddt :  soft tree + pe feature
-        clustree : clustree 
-        device-clustree : clustree + pe features
-    """
+    "tree":"soft-ddt", # ddt
     
-    "subtree":"forest", # choosing core & dvfs from a forst of trees (a tree per device)
-    "subtree":"first-choice", # choosing first availiable core and the first dvfs
-    "subtree_max_depth":"3", # choosing first availiable core and the first dvfs
-    "subtree_lr":"0.005", # choosing first availiable core and the first dvfs
-    
-    
+    #    ddt :  ddt 
+    #    device-ddt :  ddt + pe features
+    #    soft-ddt :  soft tree
+    #    soft-device-ddt :  soft tree + pe feature
+    #    clustree : clustree 
+    #    device-clustree : clustree + pe features
     
     "rewardSetup":5, 
-    """
-        1 : -1 * (alpha * e + beta * t)
-        2 : 1 / (alpha * e + beta * t)
-        3 : -np.exp(alpha * e) - np.exp(beta * t)
-        4 : -np.exp(alpha * e + beta * t)
-        5 : np.exp(-1 * (alpha * e + beta * t))
-        6 : -np.log(alpha * e + beta * t)
-        7 : -((alpha * e + beta * t) ** 2)
-    """
+       
+    #   1 : -1 * (alpha * e + beta * t)
+    #   2 : 1 / (alpha * e + beta * t)
+    #   3 : -np.exp(alpha * e) - np.exp(beta * t)
+    #   4 : -np.exp(alpha * e + beta * t)
+    #   5 : np.exp(-1 * (alpha * e + beta * t))
+    #   6 : -np.log(alpha * e + beta * t)
+    #   7 : -((alpha * e + beta * t) ** 2)
+    
     "alpha":1, # energy coffeicent in the reware
     "beta":1, # time coffeicent in the reware
+    
     "increasing_punish":True,
-    "punish":1, 
     "init_punish":-10,
+    "punish_epsilon":-0.001,
     
     "should_explore":True,
     "explore_epsilon":True,
     "num_jobs":1000,
-    
     
     "tree_max_depth":3,
 

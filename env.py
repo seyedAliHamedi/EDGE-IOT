@@ -65,18 +65,22 @@ class Environment():
                 if devices:
                     selected_device_index = self.devices.index(devices[selected_device_index])
                     
-                path_job.append(path)
+                core_index = 0
+                (freq,vol) = self.devices[selected_device_index]['voltages_frequencies'][core_index][0]
+                reward, t, e, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,core_i=core_index,freq=freq,volt=vol,task_ID=task_id)
                 
-                    
-                reward, t, e, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,core_i=0,freq=1,volt=1,task_ID=task_id)
+                
                 
                 self.actor_critic.archive(input_state, action, reward)
+                
+                
                 
                 reward_job += reward
                 time_job += t
                 energy_job += e
                 fails = np.array([taskFail + safeFail, taskFail, safeFail])
                 fail_job += fails
+                path_job.append(path)
                 
             loss_job=self.actor_critic.calc_loss()
             self.monitor.update(time_job,energy_job,reward_job,loss_job,fail_job,usage_job,len(tasks),path_job)

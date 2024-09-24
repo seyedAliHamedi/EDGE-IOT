@@ -4,6 +4,8 @@ from typing import Counter
 from sklearn.cluster import KMeans
 from data.config import learning_config
 from data.db import Database
+
+# FEATURE EXTRACTION
 def get_input(task):
     if learning_config['onehot_kind']:
         task_features = [
@@ -50,9 +52,18 @@ def extract_pe_data(pe):
 
     return [devicePower, battery]
 
-def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
-    if punish:
-        return -10
+# REWARDS AND PUNISHMENTS
+def reward_function(e=0,t=0,punish=0):
+    setup = learning_config['rewardSetup']
+    alpha = learning_config['alpha']
+    beta = learning_config['beta']
+    
+    if punish and learning_config['increasing_punish']:
+        learning_config['init_punish'] += learning_config['punish_epsilon']
+    
+    if punish :
+        return learning_config['init_punish']
+
 
     if setup == 1:
         return -1 * (alpha * e + beta * t)
@@ -69,12 +80,12 @@ def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
     elif setup == 7:
         return -((alpha * e + beta * t) ** 2)
 
+# FORMULAS
 def calc_execution_time(device, task, core, dvfs):
     if device['id'] == "cloud":
         return task["computational_load"] / device["voltages_frequencies"][0]
     else:
         return task["computational_load"] / device["voltages_frequencies"][core][dvfs][0]
-
 
 def calc_power_consumption(device, task, core, dvfs):
     if device['id'] == "cloud":return 13.85 
@@ -143,11 +154,9 @@ def calc_total(device, task, core, dvfs):
     return totalTime , totalEnergy
 
 
-def regularize_any():
-    pass
 
 
-
+# CLUSTERING
 def balance_kmeans_cluster(devices,k=2, random_state=42):
     data = [extract_pe_data_for_clustering(device) for device in devices]
     if len(devices) < k:

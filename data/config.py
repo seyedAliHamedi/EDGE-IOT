@@ -107,13 +107,13 @@ learning_config={
     
     ###### EXPLORE #######
     "should_explore":True,
-    "explore_epsilon":True,
+    "explore_epsilon":1e-5,
     "num_jobs":10000,
     
     ###### INPUT & OUTPUT #######
     "onehot_kind":True,   # onehotting the task kind
     "regulrize_input":True, # regulirze the task/device features to feed the tree
-    "regulrize_output":True,  # regulirze t,e for the reward
+    "regulrize_output":False,  # regulirze t,e for the reward
     'pe_num_features':2,
     
     ###### ALGORITHM #######

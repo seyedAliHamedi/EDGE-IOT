@@ -35,7 +35,7 @@ class SoftDDT(nn.Module):
             return self.prob_dist, path
         
         # Compute decision value using weights and bias
-        val = torch.sigmoid(torch.matmul(x, self.weights) + self.bias)
+        val = torch.sigmoid((torch.matmul(x, self.weights) + self.bias))
 
         # Recursive calls to left and right subtrees
         left_output, left_path = self.left(x, path + "L")

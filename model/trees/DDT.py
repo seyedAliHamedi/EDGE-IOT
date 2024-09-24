@@ -52,7 +52,7 @@ class DDT(nn.Module):
             return self.prob_dist, path
         
         # Internal node: compute decision value using weights and bias
-        val = torch.sigmoid(torch.matmul(x, self.weights) + self.bias)
+        val = torch.sigmoid((torch.matmul(x, self.weights) + self.bias))
         
         # Exploration phase: adjust the value randomly
         if np.random.random() < self.exploration_rate and self.shouldExplore:

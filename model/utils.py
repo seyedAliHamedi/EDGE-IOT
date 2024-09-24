@@ -25,19 +25,19 @@ def get_tree():
     elif tree == "clustree":
         return ClusTree(num_input=get_num_input(devices=False),devices=devices,depth=0,max_depth=max_depth)
     elif tree == "device-clustree":
-        return DeviceClusterTree(num_input=get_num_input(devices=True),devices=devices,depth=0,max_depth=max_depth)
+        return DeviceClusterTree(num_input=get_num_input(devices=False),devices=devices,depth=0,max_depth=max_depth)
 
 
 def get_num_input(devices):
     if devices:
-        pe_feature = learning_config['pe_num_features'] * len(devices)
+        pe_feature = learning_config['pe_num_features'] * len(Database().get_all_devices())
         num_input = 5 + pe_feature
-        if learning_config['onehot-kind']:
+        if learning_config['onehot_kind']:
             num_input = 8  + pe_feature
         return num_input
     else:
         num_input = 5
-        if learning_config['onehot-kind']:
+        if learning_config['onehot_kind']:
             num_input = 8
         return num_input
     

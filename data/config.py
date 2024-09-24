@@ -21,7 +21,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 4,
+        "num_devices": 5,
         "num_cores": [8],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -56,7 +56,7 @@ devices_config = {
 }
 
 jobs_config = {
-    "num_jobs": 100,
+    "num_jobs": 1000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 2,
@@ -73,17 +73,20 @@ jobs_config = {
 
 
 learning_config={
-    "tree":"ddt", # ddt
+    "tree":"clustree", # ddt
     """
         ddt :  ddt 
         device-ddt :  ddt + pe features
         soft-ddt :  soft tree
+        soft-device-ddt :  soft tree + pe feature
         clustree : clustree 
         device-clustree : clustree + pe features
     """
     
     "subtree":"forest", # choosing core & dvfs from a forst of trees (a tree per device)
     "subtree":"first-choice", # choosing first availiable core and the first dvfs
+    "subtree_max_depth":"3", # choosing first availiable core and the first dvfs
+    "subtree_lr":"0.005", # choosing first availiable core and the first dvfs
     
     
     
@@ -103,16 +106,21 @@ learning_config={
     "punish":1, 
     "init_punish":-10,
     
-    "should explore":True,
+    "should_explore":True,
+    "explore_epsilon":True,
+    "num_jobs":1000,
     
     
     "tree_max_depth":3,
-    
 
  
-    "onehot-kind":True,   # onehotting the task kind
+    "onehot_kind":True,   # onehotting the task kind
     "regulrize_input":True, # regulirze the task/device features to feed the tree
     "regulrize_output":True,  # regulirze t,e for the reward
+    
+    
+    'pe_num_features':2,
+    
     
     
     "learning_algorithm":"ppo",

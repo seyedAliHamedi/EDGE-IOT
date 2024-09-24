@@ -51,7 +51,6 @@ class Environment():
 
     def run(self):
         for job_id in range(len(self.jobs)):
-
             time_job = energy_job = reward_job = loss_job = 0
             fail_job = usage_job = np.array([0,0,0])
             path_job = []
@@ -61,14 +60,17 @@ class Environment():
                 current_task = Database().get_task_norm(task_id)
                 input_state = get_input(current_task)
 
-        
-                selected_device_index, path = self.actor_critic.choose_action(input_state)
+                action, path ,devices= self.actor_critic.choose_action(input_state)
+                selected_device_index = action
+                if devices:
+                    selected_device_index = self.devices.index(devices[selected_device_index])
+                    
                 path_job.append(path)
                 
                     
                 reward, t, e, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,core_i=0,freq=1,volt=1,task_ID=task_id)
                 
-                self.actor_critic.archive(input_state, selected_device_index, reward)
+                self.actor_critic.archive(input_state, action, reward)
                 
                 reward_job += reward
                 time_job += t
@@ -86,6 +88,7 @@ class Environment():
             
         self.monitor.save_results()
         self.monitor.plot_histories()
+        print("COMPLETED")
         
     
    

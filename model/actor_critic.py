@@ -4,13 +4,15 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 from data.config import learning_config
+from model.trees.ClusTree import ClusTree
+from model.trees.DeviceClusTree import DeviceClusterTree
 from model.utils import get_tree, get_critic
 
 class ActorCritic(nn.Module):
     def __init__(self):
         super(ActorCritic, self).__init__()
         self.discount_factor = learning_config['discount_factor']
-        self.actor = get_tree()
+        self.actor = get_tree()  # Initialize actor
         self.critic = get_critic()  # Critic could be None
         self.reset_memory()
 
@@ -26,14 +28,21 @@ class ActorCritic(nn.Module):
 
     # Forward pass through both actor and critic (if present)
     def forward(self, x):
-        p, path = self.actor(x)  # Policy distribution from the actor
+        # Get policy distribution and path from the actor
+        # Determine if the actor is ClusTree or DDT based on its output
+        if isinstance(self.actor, ClusTree) or isinstance(self.actor, DeviceClusterTree)  :
+            p, path,devices = self.actor(x)  # Get policy distribution and path from the actor
+        else:
+            p, path = self.actor(x)  # Get policy distribution and path from the actor
+            devices = None  # tree does not return devices
+        
         v = self.critic(x) if self.critic is not None else None  # Value estimate from the critic, if applicable
-        return p, path, v
+        return p, path, devices, v
 
     # Select action based on actor's policy
     def choose_action(self, observation):
         state = torch.tensor(observation, dtype=torch.float)
-        pi, path, _ = self.forward(state)
+        pi, path, devices, _ = self.forward(state)
         
         self.pis.append(pi)  # Store policy distribution
 
@@ -41,7 +50,7 @@ class ActorCritic(nn.Module):
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
 
-        return action.item(), path  # Return sampled action and the path
+        return action.item(), path, devices  # Return sampled action, the path, and devices
 
     # Calculate the discounted returns from the stored rewards
     def calculate_returns(self):

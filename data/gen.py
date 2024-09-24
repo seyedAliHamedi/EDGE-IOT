@@ -86,6 +86,7 @@ class Generator:
                             config["battery_capacity"][0], config["battery_capacity"][1]
                         ) * 1e3
                     ),
+                    "battery_level":-1 if config["battery_capacity"] == -1 else 100,
                     "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
                     ),

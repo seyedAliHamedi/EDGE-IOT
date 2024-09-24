@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 from typing import Counter
 from sklearn.cluster import KMeans
-def get_input(task, pe_dict={},device_features=False,subtree=False):
+from data.config import learning_config
+from data.db import Database
+def get_input(task):
+    if learning_config['onehot_kind']:
         task_features = [
             task["computational_load"],
             task["input_size"],
@@ -13,30 +16,39 @@ def get_input(task, pe_dict={},device_features=False,subtree=False):
             task["kind4"],
             task["is_safe"],
         ]
-        if not subtree and not device_features:
-            return task_features
-        
-        pe_features = []
-        for pe in pe_dict.values():
-            pe_features.extend(get_pe_data(pe, pe['id'],subtree))
-        return task_features + pe_features
+    else:
+        task_features = [
+            task["computational_load"],
+            task["input_size"],
+            task["output_size"],
+            task["task_kind"],
+            task["is_safe"],
+        ]
+    pe_features = []
+    if learning_config['tree'] in ("device-clustree","soft-device-ddt","device-ddt"):
+        for pe in Database().get_all_devices():
+            pe_features.extend(extract_pe_data(pe))
+    return task_features + pe_features
 
-def get_pe_data(pe_dict, pe_id,subtree):
-        pe = None
-        # state.database.get_device(pe_id)
-        devicePower = pe['devicePower']
+def extract_pe_data(pe):
+    if pe['type'] != "cloud":
+        devicePower = 0
+        for index, core in enumerate(pe["voltages_frequencies"]):
+            corePower = 0
+            for mod in core:
+                freq, vol = mod
+                corePower += freq / vol
+            devicePower += corePower
+        devicePower = devicePower / pe['num_cores']
+    else:
+        devicePower = 1e9
 
-        batteryLevel = pe_dict['batteryLevel']
-        battery_capacity = pe['battery_capacity']
-        battery_isl = pe['ISL']
-        battery = ((1 - battery_isl) * battery_capacity - batteryLevel) / battery_capacity
+    batteryLevel = pe['battery_level']
+    battery_capacity = pe['battery_capacity']
+    battery_isl = pe['ISL']
+    battery = ((1 - battery_isl) * battery_capacity - batteryLevel) / battery_capacity
 
-        num_cores = pe['num_cores']
-        cores = 1 - (sum(pe_dict['occupiedCores']) / num_cores)
-        if subtree:
-            return pe_dict['occupiedCores'] + [ devicePower, battery]
-        else:
-            return [cores, devicePower, battery]
+    return [devicePower, battery]
 
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
     if punish:
@@ -136,26 +148,24 @@ def regularize_any():
 
 
 
-def balance_kmeans_cluster(devices, k=2):
-        data = [get_pe_data(device) for _, device in devices.iterrows()]
+def balance_kmeans_cluster(devices,k=2, random_state=42):
+    data = [extract_pe_data_for_clustering(device) for device in devices]
+    if len(devices) < k:
+        return [devices] * k
+    X = np.array(data)
+    kmeans = KMeans(n_clusters=k, init="random", random_state=random_state)
+    kmeans.fit(X)
 
-        if len(devices) < k + 1:
-            return [devices] * k
-        X = np.array(data)
-        kmeans = KMeans(n_clusters=k, init="random", random_state=42)
-        kmeans.fit(X)
+    cluster_labels = kmeans.labels_
+    clusters = [[] for _ in range(k)]
 
-        cluster_labels = kmeans.labels_
-        clusters = [devices.iloc[[]].copy() for _ in range(k)]
+    balanced_labels = balance_clusters(cluster_labels, k, len(devices))
 
-        # Balance the clusters
-        balanced_labels = balance_clusters(cluster_labels, k, len(devices))
+    for device, label in zip(devices, balanced_labels):
+        clusters[label].append(device)
+    return clusters
 
-        for (index, device), label in zip(devices.iterrows(), balanced_labels):
-            clusters[label] = pd.concat([clusters[label], device.to_frame().T], ignore_index=True)
-        return clusters
-
-def get_pe_data(pe):
+def extract_pe_data_for_clustering(pe):
         capacitance = sum(pe['capacitance'])
         handleSafeTask = pe['handleSafeTask']
         kind = sum(pe['acceptableTasks'])
@@ -168,7 +178,7 @@ def get_pe_data(pe):
                     freq, vol = mod
                     corePower += freq / vol
                 devicePower += corePower
-            devicePower = devicePower / pe['number_of_cpu_cores']
+            devicePower = devicePower / pe['num_cores']
         else:
             devicePower = 1e9
 

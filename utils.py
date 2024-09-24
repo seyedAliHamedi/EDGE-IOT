@@ -1,13 +1,14 @@
 import numpy as np
 from typing import Counter
 from sklearn.cluster import KMeans
-from data.config import learning_config
+from data.config import *
 from data.db import Database
 from collections import Counter
 
 
 # FEATURE EXTRACTION
 def get_input(task):
+
     if learning_config['onehot_kind']:
         task_features = [
             task["computational_load"],
@@ -159,6 +160,42 @@ def calc_total(device, task, core, dvfs):
         totalEnergy = baseEnergy
 
     return totalTime, totalEnergy
+
+
+def getBatteryPunish(b_start, b_end, alpha=100.0, beta=3.0, gamma=0.1):
+    if b_start < b_end:
+        raise ValueError("Final battery level must be less than or equal to the initial battery level.")
+
+    # Calculate the percentage of battery drained and apply non-linearity
+    battery_drain = (b_start - b_end) ** gamma
+
+    # Calculate the exponential penalty factor based on the remaining battery level
+    low_battery_factor = ((100 - b_end) / 100) ** beta
+
+    # Calculate the total penalty
+    penalty = -alpha * battery_drain * low_battery_factor
+
+    return -penalty
+
+
+def checkBatteryDrain(energy, device):
+    punish = 0
+    batteryFail = 0
+
+    if device['type'] == "iot":
+        battery_capacity = device["battery_level"]
+        battery_start = device["battery_now"]
+        battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
+        if battery_end < device["ISL"]:
+            batteryFail = 1
+        else:
+            punish = getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
+            Database().get_device(device["id"])['battery_now'] = battery_end
+            # if battery_end < 20:
+            #     print(f'device: {device["id"]} b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
+            # print(f"{battery_start - battery_end} -> {punish}, energy: {energy}")
+
+    return punish, batteryFail
 
 
 # CLUSTERING

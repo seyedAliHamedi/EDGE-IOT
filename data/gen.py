@@ -12,7 +12,7 @@ class Generator:
     _device_id_counter = 0
     _job_id_counter = 0
 
-    _devices_path = os.path.join(os.path.dirname(__file__), "resources", "devices.csv")
+    _devices_path = os.path.join(os.path.dirname(__file__), "resources", "scattered_devices.csv")
     _job_path = os.path.join(os.path.dirname(__file__), "resources", "jobs.csv")
     _tasks_path = os.path.join(os.path.dirname(__file__), "resources", "tasks.csv")
 
@@ -42,7 +42,7 @@ class Generator:
     #   capacitance in nano-Farad
     #   powerIdle in Watt
     #   ISL in percentage
-    #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W*milli-second, 10Wh or
+    #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W * millisecond, 10Wh or
 
     @classmethod
     def _generate_device(cls, config=devices_config, file_path=_devices_path):
@@ -91,6 +91,7 @@ class Generator:
                         ) * 1e3
                     ),
                     "battery_level": -1 if config["battery_capacity"] == -1 else 100,
+                    "battery_now": -1 if config["battery_capacity"] == -1 else 100,
                     "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
                     ),

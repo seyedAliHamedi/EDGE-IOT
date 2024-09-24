@@ -45,10 +45,13 @@ class Environment():
         total_t, total_e = calc_total(pe, task, core_i, 0)
         reg_e = total_e
         reg_t = total_t
+        battery_drain_punish = batteryFail = 0
+        if learning_config["drain_battery"]:
+            battery_drain_punish, batteryFail = checkBatteryDrain(reg_e, device=pe)
         # if self.shouldRegular:
         # reg_t = regularize_any(total_t, 1)
         # reg_e = regularize_any(total_e, 2)
-        return reward_function(t=reg_t, e=reg_e), reg_t, reg_e, fail_flags[1], fail_flags[0]
+        return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, fail_flags[1], fail_flags[0]
 
     def run(self):
         starting_time = time.time()
@@ -101,3 +104,5 @@ class Environment():
         self.monitor.save_results()
         self.monitor.plot_histories()
         print("COMPLETED")
+
+

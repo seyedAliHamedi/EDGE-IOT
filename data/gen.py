@@ -9,7 +9,7 @@ import random
 
 class Generator:
     _task_id_counter = 0
-    _device_id_counter = 0
+    device_id_counter = 0
     _job_id_counter = 0
 
     _devices_path = os.path.join(os.path.dirname(__file__), "resources", "scattered_devices.csv")
@@ -31,6 +31,7 @@ class Generator:
             devices["acceptableTasks"] = devices["acceptableTasks"].apply(
                 lambda x: ast.literal_eval(x)
             )
+            Generator.device_id_counter = len(devices)-1
             return devices
         else:
             return Generator._generate_device()
@@ -57,7 +58,7 @@ class Generator:
                     else int(np.random.choice(config["num_cores"]))
                 )
                 device_info = {
-                    "id": Generator._device_id_counter,
+                    "id": Generator.device_id_counter,
                     "type": type,
                     "num_cores": cpu_cores,
                     "voltages_frequencies": [
@@ -110,7 +111,7 @@ class Generator:
                 }
                 if type == 'cloud':
                     device_info['acceptableTasks'] = [1, 2, 3, 4]
-                Generator._device_id_counter += 1
+                Generator.device_id_counter += 1
                 devices_data.append(device_info)
 
         devices = pd.DataFrame(devices_data)
@@ -130,7 +131,7 @@ class Generator:
         cpu_cores =  int(np.random.choice(device_config["num_cores"]))
         # Generate the device info
         device_info = {
-            "id": Generator._device_id_counter,
+            "id": Generator.device_id_counter,
             "type": device_type,
             "num_cores":cpu_cores,
             "voltages_frequencies": [
@@ -163,7 +164,7 @@ class Generator:
                     device_config["battery_capacity"][0], device_config["battery_capacity"][1]
                 ) * 1e3
             ),
-            "battery_level": -1 if device_config["battery_capacity"] == -1 else 100,
+            "battery_now": -1 if device_config["battery_capacity"] == -1 else 100,
             "error_rate": np.random.uniform(
                 device_config["error_rate"][0], device_config["error_rate"][1]
             ),
@@ -179,8 +180,7 @@ class Generator:
             ),
             "maxQueue": device_config["maxQueue"],
         }
-
-        Generator._device_id_counter += 1
+        Generator.device_id_counter +=1
         return device_info
 
     @classmethod
@@ -206,6 +206,9 @@ class Generator:
         start_node_number = 1  # Keep track of task IDs across DAGs
 
         for job_id in range(config["num_jobs"]):
+            if (job_id / config["num_jobs"]*100) % 10 ==0:
+                print("Generating jobs : ",job_id / config["num_jobs"]*100,"%")
+            
             # Generate a random DAG for the job
             num_nodes = random.randint(config["min_num_nodes_dag"], config["max_num_nodes_dag"])
             random_dag = cls.generate_random_dag(num_nodes)

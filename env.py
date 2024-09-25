@@ -53,7 +53,7 @@ class Environment():
         # if self.shouldRegular:
             # reg_t = regularize_any(total_t, 1)
             # reg_e = regularize_any(total_e, 2)
-        return reward_function(t=reg_t , e=reg_e), reg_t,reg_e, fail_flags[1], fail_flags[0]
+        return reward_function(t=reg_t , e=reg_e)+battery_drain_punish, reg_t,reg_e, fail_flags[1], fail_flags[0]
     
     def add_device(self):
         # Add a new random device using the Database method
@@ -67,7 +67,7 @@ class Environment():
     def remove_device(self):
         # Randomly remove a device
         if len(self.devices) > 1:
-            device_index = np.random.randint(0, len(self.devices))
+            device_index = np.random.randint(0, len(self.devices)-1)
             device_id = self.devices[device_index]['id']
 
             # Remove the selected device from the Database
@@ -80,9 +80,11 @@ class Environment():
     def run(self):
         starting_time = time.time()
         for job_id in range(len(self.jobs)):
-            
+            if job_id == 10000:
+                self.monitor.plot_histories()
+                print("plotted -0--------")
             # Dynamically add/remove devices
-            if learning_config['scalability']:
+            if learning_config['scalability'] and job_id >10000:
                 if np.random.random() < learning_config['add_device_iterations']:
                     print("add")
                     self.add_device()
@@ -107,6 +109,7 @@ class Environment():
                 selected_device_index = action
                 if devices:
                     selected_device_index = self.devices.index(devices[selected_device_index])
+                
                 selected_device = self.devices[selected_device_index]
                 core_index = 0
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]

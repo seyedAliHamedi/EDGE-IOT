@@ -85,15 +85,16 @@ class ActorCritic(nn.Module):
         self.pis.append(pi)  # Store policy distribution
 
         probs = F.softmax(pi, dim=-1)
+        
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
         
-        # Reshape the feature data if needed (assuming pe_data is a 1D array)
-        pe_data = np.array(extract_pe_data(Database().get_device(action.item()))).reshape(1, -1)
-        # Reshape the target y (pi[action.item()].detach()) into a 1D array
-        target = np.array([pi[action.item()].detach()])
-        # Fit the regressor
-        self.logit_regressor.fit(pe_data, target)
+        # # Reshape the feature data if needed (assuming pe_data is a 1D array)
+        # pe_data = np.array(extract_pe_data(Database().get_device(action.item()))).reshape(1, -1)
+        # # Reshape the target y (pi[action.item()].detach()) into a 1D array
+        # target = np.array([pi[action.item()].detach()])
+        # # Fit the regressor
+        # self.logit_regressor.fit(pe_data, target)
         
         return action.item(), path, devices  # Return sampled action, the path, and devices
 

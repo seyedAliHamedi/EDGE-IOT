@@ -1,6 +1,6 @@
 
 jobs_config = {
-    "num_jobs": 10000,
+    "num_jobs": 20000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 5,
@@ -12,9 +12,9 @@ jobs_config = {
         "safe_measurement": [0.5, 0.5],
         "task_kinds": [1, 2, 3, 4]
     },
-    "max_num_parents_dag": 5,
+    "max_num_parents_dag": 1,
     "min_num_nodes_dag": 4,
-    "max_num_nodes_dag": 20
+    "max_num_nodes_dag": 16
 }
 
 devices_config = {
@@ -111,9 +111,9 @@ learning_config = {
     ###### EXPLORE #######
     "should_explore": False,
     "explore_epsilon": 1e-5,
-    "num_jobs": 10000,
+    "num_jobs": 20000,
 
-    "drain_battery": True,
+    "drain_battery": False,
 
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
@@ -137,8 +137,8 @@ learning_config = {
     
     
     "scalability":True,
-    "add_device_iterations":0.0,
-    "remove_device_iterations":0.0,
+    "add_device_iterations":0.001,
+    "remove_device_iterations":0.001,
     
     
     ###### PATHS #######

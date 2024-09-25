@@ -85,12 +85,9 @@ class DDT(nn.Module):
             # Get the features of the new device
             new_device_features =extract_pe_data(new_device)  # Assuming new_device is a DataFrame row
 
-            try:
-            # Predict the logit using the trained linear regression model
-                predicted_logit = logit_regressor.predict([new_device_features])[0]
-            except:
-                predicted_logit =0.0
-                
+            # predicted_logit = logit_regressor.predict([new_device_features])[0]
+            predicted_logit = sum(self.prob_dist)/len(self.prob_dist)
+            
                 
             new_device_dist = torch.tensor([predicted_logit], requires_grad=True)
             # Append the predicted logit to prob_dist

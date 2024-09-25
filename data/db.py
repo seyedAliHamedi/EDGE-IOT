@@ -28,7 +28,12 @@ class Database:
     # ---------- single ------------
 
     def get_device(self, id):
-        return self._devices.iloc[id].to_dict()
+        try:
+            return self._devices.iloc[id].to_dict()
+        except:
+            print("OOOOO ",id,self._devices,id)
+
+        
 
     def get_job(self, id):
         return self._jobs.iloc[id].to_dict()
@@ -53,7 +58,7 @@ class Database:
 
         # Concatenate the new device to the existing dataframe
         self._devices = pd.concat([self._devices, new_device_df], ignore_index=True)
-
+        
         return new_device
 
     

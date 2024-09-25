@@ -1,6 +1,5 @@
-
 jobs_config = {
-    "num_jobs": 20000,
+    "num_jobs": 10000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 5,
@@ -19,7 +18,7 @@ jobs_config = {
 
 devices_config = {
     "iot": {
-        "num_devices": 20,
+        "num_devices": 100,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -41,7 +40,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 11,
+        "num_devices": 50,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -111,7 +110,7 @@ learning_config = {
     ###### EXPLORE #######
     "should_explore": False,
     "explore_epsilon": 1e-5,
-    "num_jobs": 20000,
+    "num_jobs": 10000,
 
     "drain_battery": True,
 
@@ -127,20 +126,18 @@ learning_config = {
     #   policy-grad
     #   a2c
     #   ppo
-    
-    "ppo_epsilon":0.2,
-    
-    "critic_hidden_layer_num":1,
-    "critic_hidden_layer_dim":128,
-    
-    "discount_factor":0, # 0: reward , 0.99:return
-    
-    
-    "scalability":True,
-    "add_device_iterations":0.001,
-    "remove_device_iterations":0.001,
-    
-    
+
+    "ppo_epsilon": 0.2,
+
+    "critic_hidden_layer_num": 1,
+    "critic_hidden_layer_dim": 128,
+
+    "discount_factor": 0,  # 0: reward , 0.99:return
+
+    "scalability": False,
+    "add_device_iterations": 0.001,
+    "remove_device_iterations": 0.001,
+
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',
     "result_plot_path": './results/result.png',

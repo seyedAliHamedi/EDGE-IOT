@@ -31,9 +31,7 @@ class Database:
         try:
             return self._devices.loc[self._devices['id'] == id].to_dict(orient='records')[0]
         except:
-            print(id,self._devices,id)
-
-    
+            print(id, self._devices, id)
 
     def get_job(self, id):
         return self._jobs.iloc[id].to_dict()
@@ -43,7 +41,7 @@ class Database:
 
     def get_task_norm(self, id):
         return self._task_norm.iloc[id].to_dict()
-    
+
     # ---------- add & remove ------------
     def add_device(self, id):
         # Generate a new random device
@@ -55,29 +53,26 @@ class Database:
         # Concatenate the new device to the existing dataframe
         self._devices = pd.concat([self._devices, new_device_df], ignore_index=True)
         self._devices.reset_index(drop=True, inplace=True)
-        self._devices['id']=self._devices.index
+        self._devices['id'] = self._devices.index
         return new_device
 
-    
     def remove_device(self, id):
         # Assuming `id` is a column in the devices dataframe
         self._devices = self._devices[self._devices['id'] != id]
         self._devices.reset_index(drop=True, inplace=True)
-        self._devices['id']=self._devices.index
+        self._devices['id'] = self._devices.index
 
     # -------- normalize -------
     def normalize_tasks(self, tasks_normalize):
         for column in tasks_normalize.columns.values:
             if column in ("computational_load", "input_size", "output_size", "is_safe"):
                 tasks_normalize[column] = (tasks_normalize[column] - tasks_normalize[column].min()) / (
-                            tasks_normalize[column].max() - tasks_normalize[column].min())
+                        tasks_normalize[column].max() - tasks_normalize[column].min())
         kinds = [1, 2, 3, 4]
         for kind in kinds:
             tasks_normalize[f'kind{kind}'] = tasks_normalize['task_kind'].isin([kind]).astype(int)
-        tasks_normalize.drop(['task_kind'],axis=1)
+        tasks_normalize.drop(['task_kind'], axis=1)
         return tasks_normalize
 
-
-
-    def set_device_battery(self,id,end):
-        self._devices.loc[self._devices['id'] == id, 'battery_now'] = int(end)
+    def set_device_battery(self, id, end):
+        self._devices.loc[self._devices['id'] == id, 'battery_now'] = end

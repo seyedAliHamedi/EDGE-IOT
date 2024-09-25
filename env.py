@@ -13,18 +13,16 @@ from utils import *
 from sklearn.linear_model import LinearRegression
 
 
-
 class Environment():
     def __init__(self):
-        self.devices=Database().get_all_devices()
-        self.jobs=Database().get_all_jobs()
-        self.tasks=Database().get_all_tasks()
-        
-        
+        self.devices = Database().get_all_devices()
+        self.jobs = Database().get_all_jobs()
+        self.tasks = Database().get_all_tasks()
+
         self.logit_regressor = LinearRegression()
-        self.actor_critic =ActorCritic(logit_regressor =self.logit_regressor)
-        self.optimizer = optim.Adam(self.actor_critic.parameters(),lr=0.005)
-        
+        self.actor_critic = ActorCritic(logit_regressor=self.logit_regressor)
+        self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
+
         self.monitor = Monitor()
 
     ##### Functionality
@@ -50,11 +48,14 @@ class Environment():
         battery_drain_punish = batteryFail = 0
         if learning_config["drain_battery"]:
             battery_drain_punish, batteryFail = checkBatteryDrain(reg_e, device=pe)
+
+        if batteryFail:
+            return reward_function(punish=True), 0, 0, fail_flags[1], fail_flags[0]
         # if self.shouldRegular:
-            # reg_t = regularize_any(total_t, 1)
-            # reg_e = regularize_any(total_e, 2)
-        return reward_function(t=reg_t , e=reg_e)+battery_drain_punish, reg_t,reg_e, fail_flags[1], fail_flags[0]
-    
+        # reg_t = regularize_any(total_t, 1)
+        # reg_e = regularize_any(total_e, 2)
+        return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, fail_flags[1], fail_flags[0]
+
     def add_device(self):
         # Add a new random device using the Database method
         new_device_id = len(self.devices)  # You can use a more complex ID generation logic if needed
@@ -66,10 +67,10 @@ class Environment():
 
     def remove_device(self):
         # Randomly remove a device
-        if len(self.devices) > 1 :
-            device_index = np.random.randint(0, len(self.devices)-1)
+        if len(self.devices) > 1:
+            device_index = np.random.randint(0, len(self.devices) - 1)
             device_id = self.devices[device_index]['id']
-            if self.devices[device_index]['type']=='cloud':
+            if self.devices[device_index]['type'] == 'cloud':
                 return self.remove_device()
 
             # Remove the selected device from the Database
@@ -86,17 +87,16 @@ class Environment():
                 self.monitor.plot_histories()
                 print("plotted -0--------")
             # Dynamically add/remove devices
-            if learning_config['scalability']and  job_id >10000:
+            if learning_config['scalability'] and job_id > 10000:
                 if np.random.random() < learning_config['add_device_iterations']:
                     print("add")
                     self.add_device()
                 if np.random.random() < learning_config['remove_device_iterations']:
                     print("removed")
                     self.remove_device()
-                    
-            
-            if ((job_id / len(self.jobs))*100)%10==0:
-                print(f"{((job_id / len(self.jobs))*100)}% done in {int(time.time()-starting_time)} seconds")
+
+            if ((job_id / len(self.jobs)) * 100) % 10 == 0:
+                print(f"{((job_id / len(self.jobs)) * 100)}% done in {int(time.time() - starting_time)} seconds")
             time_job = energy_job = reward_job = loss_job = 0
             fail_job = np.array([0, 0, 0])
             usage_job = np.array([0, 0, 0])
@@ -111,7 +111,7 @@ class Environment():
                 selected_device_index = action
                 if devices:
                     selected_device_index = self.devices.index(devices[selected_device_index])
-                
+
                 selected_device = self.devices[selected_device_index]
                 core_index = 0
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
@@ -132,18 +132,15 @@ class Environment():
                 if selected_device['type'] == 'cloud':
                     usage_job[2] += 1
                 path_job.append(path)
-                
-            
-            loss_job=self.actor_critic.calc_loss()
-            self.monitor.update(time_job,energy_job,reward_job,loss_job,fail_job,usage_job,len(tasks),path_job)
-            
+
+            loss_job = self.actor_critic.calc_loss()
+            self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(tasks), path_job)
+
             self.optimizer.zero_grad()
             loss_job.backward()
             self.optimizer.step()
             self.actor_critic.reset_memory()
-            
+
         self.monitor.save_results()
         self.monitor.plot_histories()
         print("COMPLETED")
-
-

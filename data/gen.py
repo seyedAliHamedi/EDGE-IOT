@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import ast
-from data.config import devices_config,jobs_config
+from config import devices_config,jobs_config
 
 class Generator:
     _task_id_counter = 0
@@ -114,6 +114,69 @@ class Generator:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         devices.to_csv(file_path, index=False)
         return devices
+
+    @classmethod
+    def generate_random_device(cls, config=devices_config):
+        # Randomly select one of the device types: iot, mec not cloud
+        device_type = np.random.choice(["iot", "mec", ])
+        # Get the configuration for the chosen device type
+        device_config = config[device_type]
+
+        cpu_cores =  int(np.random.choice(device_config["num_cores"]))
+        # Generate the device info
+        device_info = {
+            "id": Generator._device_id_counter,
+            "type": device_type,
+            "num_cores":cpu_cores,
+            "voltages_frequencies": [
+                [
+                    device_config["voltage_frequencies"][i]
+                    for i in np.random.choice(len(device_config['voltage_frequencies']), size=3, replace=False)
+                ]
+                for _ in range(cpu_cores)
+            ],
+            "ISL": (
+                -1
+                if device_config["isl"] == -1
+                else np.random.uniform(device_config["isl"][0], device_config["isl"][1])
+            ),
+            "capacitance": [
+                np.random.uniform(
+                    device_config["capacitance"][0], device_config["capacitance"][1]
+                )
+                * 1e-9
+                for _ in range(cpu_cores)
+            ],
+            "powerIdle": [
+                float(np.random.choice(device_config["powerIdle"])) * 1e-6
+                for core in range(cpu_cores)
+            ],
+            "battery_capacity": (
+                -1
+                if device_config["battery_capacity"] == -1
+                else np.random.uniform(
+                    device_config["battery_capacity"][0], device_config["battery_capacity"][1]
+                ) * 1e3
+            ),
+            "battery_level": -1 if device_config["battery_capacity"] == -1 else 100,
+            "error_rate": np.random.uniform(
+                device_config["error_rate"][0], device_config["error_rate"][1]
+            ),
+            "acceptableTasks": list(np.random.choice(
+                jobs_config["task"]["task_kinds"],
+                size=np.random.randint(3, 4),
+                replace=False,
+            )),
+            "handleSafeTask": int(
+                np.random.choice(
+                    [0, 1], p=[device_config["safe"][0], device_config["safe"][1]]
+                )
+            ),
+            "maxQueue": device_config["maxQueue"],
+        }
+
+        Generator._device_id_counter += 1
+        return device_info
 
     @classmethod
     def get_jobs(cls, file_path_jobs=_job_path, file_path_tasks=_tasks_path):

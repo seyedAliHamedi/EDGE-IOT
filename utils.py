@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Counter
 from sklearn.cluster import KMeans
-from data.config import learning_config
+from config import learning_config
 from data.db import Database
 
 # FEATURE EXTRACTION
@@ -33,22 +33,18 @@ def get_input(task):
     return task_features + pe_features
 
 def extract_pe_data(pe):
-    if pe['type'] != "cloud":
-        devicePower = 0
-        for index, core in enumerate(pe["voltages_frequencies"]):
-            corePower = 0
-            for mod in core:
-                freq, vol = mod
-                corePower += freq / vol
-            devicePower += corePower
-        devicePower = devicePower / pe['num_cores']
-    else:
-        devicePower = 1e9
+    devicePower = 0
+    for index, core in enumerate(pe["voltages_frequencies"]):
+        corePower = 0
+        for mod in core:
+            freq, vol = mod
+            corePower += (freq / vol)
+        devicePower += corePower
+    devicePower = devicePower / pe['num_cores']
 
-    batteryLevel = pe['battery_level']
     battery_capacity = pe['battery_capacity']
     battery_isl = pe['ISL']
-    battery = ((1 - battery_isl) * battery_capacity - batteryLevel) / battery_capacity
+    battery = ((1 - battery_isl) * battery_capacity ) 
 
     return [devicePower, battery]
 

@@ -1,16 +1,18 @@
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from data.config import learning_config
+from config import learning_config
 from data.db import Database
 from model.trees.ClusTree import ClusTree
 from model.trees.DeviceClusTree import DeviceClusterTree
 from model.utils import get_tree, get_critic
+from utils import extract_pe_data
 
 class ActorCritic(nn.Module):
-    def __init__(self):
+    def __init__(self,logit_regressor):
         super(ActorCritic, self).__init__()
         self.discount_factor = learning_config['discount_factor']
         self.actor = get_tree()  # Initialize actor
@@ -18,7 +20,39 @@ class ActorCritic(nn.Module):
         
         self.reset_memory()
         self.old_log_probs = {i: None for i in range(len(Database().get_all_devices()))} 
+        
+        self.logit_regressor = logit_regressor
 
+
+    def add_new_device(self,new_device):
+        self.actor.add_device(new_device, logit_regressor=self.logit_regressor) 
+        self.old_log_probs[len(Database().get_all_devices())-1]=None
+        
+    def remove_new_device(self, device_index):
+        # Remove the device from actor
+        self.actor.remove_device(device_index)
+        
+        # Remove the specific device log prob and shift the rest
+        if device_index in self.old_log_probs:
+            del self.old_log_probs[device_index]
+        
+        # Shift remaining keys to the left
+        updated_log_probs = {}
+        current_index = 0  # Start from 0 for shifted index
+        for key in sorted(self.old_log_probs.keys()):
+            if key > device_index:
+                # Only shift keys greater than the removed device
+                updated_log_probs[current_index] = self.old_log_probs[key]
+                current_index += 1
+            else:
+                updated_log_probs[key] = self.old_log_probs[key]
+        
+        # Replace the old log probs with the updated one
+        self.old_log_probs = updated_log_probs
+
+        
+        
+        
     # Store experiences in memory
     def archive(self, state, action, reward):
         self.states.append(state)
@@ -38,7 +72,8 @@ class ActorCritic(nn.Module):
         else:
             p, path = self.actor(x)  # Get policy distribution and path from the actor
             devices = None  # tree does not return devices
-        
+            
+  
         v = self.critic(x) if self.critic is not None else None  # Value estimate from the critic, if applicable
         return p, path, devices, v
 
@@ -52,6 +87,13 @@ class ActorCritic(nn.Module):
         probs = F.softmax(pi, dim=-1)
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
+        
+        # Reshape the feature data if needed (assuming pe_data is a 1D array)
+        pe_data = np.array(extract_pe_data(Database().get_device(action.item()))).reshape(1, -1)
+        # Reshape the target y (pi[action.item()].detach()) into a 1D array
+        target = np.array([pi[action.item()].detach()])
+        # Fit the regressor
+        self.logit_regressor.fit(pe_data, target)
         
         return action.item(), path, devices  # Return sampled action, the path, and devices
 
@@ -71,7 +113,8 @@ class ActorCritic(nn.Module):
         actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
 
-        # Stack stored policy distributions
+    
+        # Stack the padded tensors
         pis = torch.stack(self.pis, dim=0)
         probs = F.softmax(pis, dim=-1)
         dist = Categorical(probs)

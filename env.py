@@ -11,7 +11,8 @@ from data.db import Database
 from model.actor_critic import ActorCritic
 from monitor import Monitor
 from utils import *
-torch.autograd.set_detect_anomaly(True)
+from sklearn.linear_model import LinearRegression
+
 
 class Environment():
     def __init__(self):
@@ -20,7 +21,8 @@ class Environment():
         self.tasks=Database().get_all_tasks()
         
         
-        self.actor_critic =ActorCritic()
+        self.logit_regressor = LinearRegression()
+        self.actor_critic =ActorCritic(logit_regressor =self.logit_regressor)
         self.optimizer = optim.Adam(self.actor_critic.parameters(),lr=0.005)
         
         self.monitor = Monitor()
@@ -51,10 +53,42 @@ class Environment():
             # reg_e = regularize_any(total_e, 2)
         return reward_function(t=reg_t , e=reg_e), reg_t,reg_e, fail_flags[1], fail_flags[0]
     
+    def add_device(self):
+        # Add a new random device using the Database method
+        new_device_id = len(self.devices)  # You can use a more complex ID generation logic if needed
+        device = Database().add_device(new_device_id)
+
+        # Refresh the devices list after adding a device
+        self.devices = Database().get_all_devices()
+        self.actor_critic.add_new_device(device)
+
+    def remove_device(self):
+        # Randomly remove a device
+        if len(self.devices) > 1:
+            device_index = np.random.randint(0, len(self.devices))
+            device_id = self.devices[device_index]['id']
+
+            # Remove the selected device from the Database
+            Database().remove_device(device_id)
+
+            # Refresh the devices list after removing the device
+            self.devices = Database().get_all_devices()
+            self.actor_critic.remove_new_device(device_index)
 
     def run(self):
         starting_time = time.time()
         for job_id in range(len(self.jobs)):
+            
+            # Dynamically add/remove devices
+            if learning_config['scalability']:
+                if np.random.random() < learning_config['add_device_iterations']:
+                    print("add")
+                    self.add_device()
+                if np.random.random() < learning_config['remove_device_iterations']:
+                    print("removed")
+                    self.remove_device()
+                    
+            
             if ((job_id / len(self.jobs))*100)%10==0:
                 print(f"{((job_id / len(self.jobs))*100)}% done in {int(time.time()-starting_time)} seconds")
             time_job = energy_job = reward_job = loss_job = 0
@@ -94,13 +128,14 @@ class Environment():
                     usage_job[2] +=1
                 path_job.append(path)
                 
+            
             loss_job=self.actor_critic.calc_loss()
             self.monitor.update(time_job,energy_job,reward_job,loss_job,fail_job,usage_job,len(tasks),path_job)
             
             self.optimizer.zero_grad()
             loss_job.backward()
             self.optimizer.step()
-            loss_job=self.actor_critic.reset_memory()
+            self.actor_critic.reset_memory()
             
         self.monitor.save_results()
         self.monitor.plot_histories()

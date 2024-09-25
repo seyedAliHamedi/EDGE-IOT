@@ -10,7 +10,6 @@ class Database:
             cls._instance._devices = Generator.get_devices()
             cls._instance._jobs, cls._instance._tasks = Generator.get_jobs()
             cls._instance._task_norm = cls._instance.normalize_tasks(cls._instance._tasks.copy())
-            cls._instance._devices = cls._instance.normalize_devices(cls._instance._devices)
         return cls._instance
        
        
@@ -41,6 +40,27 @@ class Database:
     def get_task_norm(self, id):
         return self._task_norm.iloc[id].to_dict()
     
+    # ---------- add & remove ------------
+    def add_device(self, id):
+        # Generate a new random device
+        new_device = Generator.generate_random_device()
+
+        # Optionally assign the id (if not part of the generated device already)
+        if 'id' not in new_device:
+            new_device['id'] = id
+
+        # Convert the new device to a DataFrame if it's not already
+        new_device_df = pd.DataFrame([new_device])
+
+        # Concatenate the new device to the existing dataframe
+        self._devices = pd.concat([self._devices, new_device_df], ignore_index=True)
+
+        return new_device
+
+    
+    def remove_device(self, id):
+        # Assuming `id` is a column in the devices dataframe
+        self._devices = self._devices[self._devices['id'] != id]
 
     # -------- normalize -------
     def normalize_tasks(self,tasks_normalize):
@@ -52,26 +72,3 @@ class Database:
             tasks_normalize[f'kind{kind}'] = tasks_normalize['task_kind'].isin([kind]).astype(int)
         tasks_normalize.drop(['task_kind'],axis=1)
         return tasks_normalize
-        
-    def get_pe_data(self, pe):
-
-        num_cores = pe['num_cores']
-
-        devicePower = 0
-        for index, core in enumerate(pe["voltages_frequencies"]):
-            corePower = 0
-            for mod in core:
-                freq, vol = mod
-                corePower += freq / vol
-            devicePower += corePower
-        devicePower = devicePower / num_cores
-
-
-        return devicePower
-
-    def normalize_devices(self, df):
-        df['devicePower'] = df.apply(self.get_pe_data, axis=1)
-
-        df['devicePower'] = (df['devicePower'] - df['devicePower'].min()) / (df['devicePower'].max() - df['devicePower'].min())
-
-        return df

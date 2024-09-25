@@ -8,7 +8,7 @@ from model.trees.DDT import DDT
 from model.trees.DeviceClusTree import DeviceClusterTree
 from model.trees.SoftDDT import SoftDDT
         
-from data.config import learning_config
+from config import learning_config
 
 def get_tree():
     tree = learning_config['tree']

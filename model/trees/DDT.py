@@ -2,7 +2,8 @@ import torch
 import numpy as np
 import torch.nn as nn
 
-from data.config import learning_config
+from config import learning_config
+from utils import extract_pe_data, get_input
 
 class DDT(nn.Module):
     def __init__(self, num_input, num_output, depth, max_depth, counter=0, exploration_rate=0):
@@ -76,3 +77,37 @@ class DDT(nn.Module):
         
         # Return an adjusted value for exploration
         return 1 - val
+    
+    
+           
+    def add_device(self, new_device,logit_regressor):
+        if self.depth == self.max_depth:
+            # Get the features of the new device
+            new_device_features =extract_pe_data(new_device)  # Assuming new_device is a DataFrame row
+
+            try:
+            # Predict the logit using the trained linear regression model
+                predicted_logit = logit_regressor.predict([new_device_features])[0]
+            except:
+                predicted_logit =0.0
+                
+                
+            new_device_dist = torch.tensor([predicted_logit], requires_grad=True)
+            # Append the predicted logit to prob_dist
+            self.prob_dist = nn.Parameter(torch.cat((self.prob_dist, new_device_dist)))
+
+        else:
+            self.left.add_device(new_device, logit_regressor)
+            self.right.add_device(new_device, logit_regressor)
+            
+    def remove_device(self, device_index):
+        if self.depth == self.max_depth:
+            # Remove the device's entry in prob_dist
+            self.prob_dist = nn.Parameter(torch.cat((self.prob_dist[:device_index], self.prob_dist[device_index+1:])))
+            
+            # Re-normalize the probabilities to ensure they sum to 1
+            # with torch.no_grad():
+            #     self.prob_dist /= torch.sum(self.prob_dist)
+        else:
+            self.left.remove_device(device_index)
+            self.right.remove_device(device_index)

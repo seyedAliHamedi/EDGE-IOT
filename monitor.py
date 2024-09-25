@@ -4,7 +4,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from data.config import learning_config
+from config import learning_config
 from data.db import Database
 
 class Monitor():

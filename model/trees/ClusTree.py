@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 
-from data.config import learning_config
+from config import learning_config
 from utils import balance_kmeans_cluster
 
 class ClusTree(nn.Module):

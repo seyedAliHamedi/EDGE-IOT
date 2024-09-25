@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 10,
+        "num_devices": 100,
         "num_cores": [4],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -21,7 +21,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 5,
+        "num_devices": 50,
         "num_cores": [8],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -65,7 +65,7 @@ jobs_config = {
         "input_size": [1, 1001],
         "output_size": [1, 1001],
         "computational_load": [1, 1001],
-        "safe_measurement": [0.8, 0.2],
+        "safe_measurement": [0.5, 0.5],
         "task_kinds": [1, 2, 3, 4],
     },
 }
@@ -101,7 +101,7 @@ learning_config={
     "beta":1, # time coffeicent in the reware
     
     ###### PUNISH #######
-    "increasing_punish":True,
+    "increasing_punish":False,
     "init_punish":-10,
     "punish_epsilon":-0.001,
     
@@ -130,6 +130,11 @@ learning_config={
     "critic_hidden_layer_dim":128,
     
     "discount_factor":0, # 0: reward , 0.99:return
+    
+    
+    "scalability":True,
+    "add_device_iterations":0.0,
+    "remove_device_iterations":0.0,
     
     
     ###### PATHS #######

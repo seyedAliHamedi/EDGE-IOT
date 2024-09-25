@@ -66,9 +66,11 @@ class Environment():
 
     def remove_device(self):
         # Randomly remove a device
-        if len(self.devices) > 1:
+        if len(self.devices) > 1 :
             device_index = np.random.randint(0, len(self.devices)-1)
             device_id = self.devices[device_index]['id']
+            if self.devices[device_index]['type']=='cloud':
+                return self.remove_device()
 
             # Remove the selected device from the Database
             Database().remove_device(device_id)
@@ -84,7 +86,7 @@ class Environment():
                 self.monitor.plot_histories()
                 print("plotted -0--------")
             # Dynamically add/remove devices
-            if learning_config['scalability'] and job_id >10000:
+            if learning_config['scalability']and  job_id >10000:
                 if np.random.random() < learning_config['add_device_iterations']:
                     print("add")
                     self.add_device()

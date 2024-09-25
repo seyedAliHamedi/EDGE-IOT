@@ -2,5 +2,6 @@ from env import Environment
 
 
 if __name__ == '__main__':
-    env = Environment()
-    env.run()
+    for i in range(3):
+        env = Environment()
+        env.run()

@@ -113,7 +113,7 @@ learning_config = {
     "explore_epsilon": 1e-5,
     "num_jobs": 20000,
 
-    "drain_battery": False,
+    "drain_battery": True,
 
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind

@@ -179,14 +179,15 @@ def checkBatteryDrain(energy, device):
     batteryFail = 0
 
     if device['type'] == "iot":
-        battery_capacity = device["battery_level"]
+        battery_capacity = device["battery_capacity"]
         battery_start = device["battery_now"]
         battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
         if battery_end < device["ISL"]:
             batteryFail = 1
         else:
             punish = getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
-            Database().get_device(device["id"])['battery_now'] = battery_end
+            Database().set_device_battery(device["id"] ,battery_end) 
+            
             # if battery_end < 20:
             #     print(f'device: {device["id"]} b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
             # print(f"{battery_start - battery_end} -> {punish}, energy: {energy}")

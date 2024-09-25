@@ -91,7 +91,6 @@ class Generator:
                             config["battery_capacity"][0], config["battery_capacity"][1]
                         ) * 1e3
                     ),
-                    "battery_level": -1 if config["battery_capacity"] == -1 else 100,
                     "battery_now": -1 if config["battery_capacity"] == -1 else 100,
                     "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
@@ -164,7 +163,7 @@ class Generator:
                     device_config["battery_capacity"][0], device_config["battery_capacity"][1]
                 ) * 1e3
             ),
-            "battery_now": -1 if device_config["battery_capacity"] == -1 else 100,
+            "battery_now": -1 if device_config["battery_capacity"] == -1 == -1 else 100,
             "error_rate": np.random.uniform(
                 device_config["error_rate"][0], device_config["error_rate"][1]
             ),

@@ -1,6 +1,8 @@
 from data.gen import Generator
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
+
+
 class Database:
     _instance = None
 
@@ -11,9 +13,7 @@ class Database:
             cls._instance._jobs, cls._instance._tasks = Generator.get_jobs()
             cls._instance._task_norm = cls._instance.normalize_tasks(cls._instance._tasks.copy())
         return cls._instance
-       
-       
-        
+
     # ------------ all ----------
 
     def get_all_devices(self):
@@ -25,7 +25,6 @@ class Database:
     def get_all_tasks(self):
         return self._tasks.to_dict(orient='records')
 
-
     # ---------- single ------------
 
     def get_device(self, id):
@@ -36,7 +35,7 @@ class Database:
 
     def get_task(self, id):
         return self._tasks.iloc[id].to_dict()
-    
+
     def get_task_norm(self, id):
         return self._task_norm.iloc[id].to_dict()
     
@@ -63,11 +62,12 @@ class Database:
         self._devices = self._devices[self._devices['id'] != id]
 
     # -------- normalize -------
-    def normalize_tasks(self,tasks_normalize):
+    def normalize_tasks(self, tasks_normalize):
         for column in tasks_normalize.columns.values:
-            if column in ("computational_load","input_size","output_size","is_safe"):
-                tasks_normalize[column] = (tasks_normalize[column] - tasks_normalize[column].min()) / (tasks_normalize[column].max() - tasks_normalize[column].min())
-        kinds=[1,2,3,4]
+            if column in ("computational_load", "input_size", "output_size", "is_safe"):
+                tasks_normalize[column] = (tasks_normalize[column] - tasks_normalize[column].min()) / (
+                            tasks_normalize[column].max() - tasks_normalize[column].min())
+        kinds = [1, 2, 3, 4]
         for kind in kinds:
             tasks_normalize[f'kind{kind}'] = tasks_normalize['task_kind'].isin([kind]).astype(int)
         tasks_normalize.drop(['task_kind'],axis=1)

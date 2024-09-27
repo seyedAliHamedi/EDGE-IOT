@@ -3,7 +3,7 @@ import numpy as np
 import torch.nn as nn
 
 from config import learning_config
-from utils import extract_pe_data, get_input
+from env.utils import extract_pe_data, get_input
 
 class DDT(nn.Module):
     def __init__(self, num_input, num_output, depth, max_depth, counter=0, exploration_rate=0):
@@ -66,6 +66,23 @@ class DDT(nn.Module):
         else:
             left_output, left_path = self.left(x, path + "L")
             return (1 - val) * left_output, left_path
+    def get_prob_dist(self,x):
+        # Leaf node: return the probability distribution
+        if self.depth == self.max_depth:
+            return self.prob_dist
+        
+        # Internal node: compute decision value using weights and bias
+        val = torch.sigmoid((torch.matmul(x, self.weights) + self.bias))
+        
+        # Exploration phase: adjust the value randomly
+        if np.random.random() < self.exploration_rate and self.shouldExplore:
+            val = self.explore(val)
+
+        # Recursive decision: traverse left or right based on val
+        if val >= 0.5:
+            return self.right(x)
+        else:
+            return self.left(x)
         
     def explore(self, val):
         self.counter += 1
@@ -80,22 +97,33 @@ class DDT(nn.Module):
     
     
            
-    def add_device(self, new_device,logit_regressor):
+    def add_device(self, new_device, logit_regressor):
         if self.depth == self.max_depth:
             # Get the features of the new device
-            new_device_features =extract_pe_data(new_device)  # Assuming new_device is a DataFrame row
+            new_device_features = extract_pe_data(new_device)
 
-            # predicted_logit = logit_regressor.predict([new_device_features])[0]
-            predicted_logit = sum(self.prob_dist)/len(self.prob_dist)
+            # Ensure the features are in the right shape for the regressor (2D array)
+            new_device_features = np.array(new_device_features).reshape(1, -1)
             
-                
-            new_device_dist = torch.tensor([predicted_logit], requires_grad=True)
-            # Append the predicted logit to prob_dist
+            # Predict logit using the logit regressor
+            predicted_logit = logit_regressor.predict(new_device_features)[0]
+
+            # Logging predicted and average logits for debugging
+            avg_logit = sum(self.prob_dist) / len(self.prob_dist)
+            print(f"Avg Logit: {avg_logit:.4f}, Predicted Logit: {predicted_logit:.4f},")
+
+            # Convert predicted logit to a tensor
+            new_device_dist = torch.tensor([predicted_logit], dtype=torch.float32)
+            
+            # Concatenate the new distribution and wrap it in nn.Parameter
             self.prob_dist = nn.Parameter(torch.cat((self.prob_dist, new_device_dist)))
 
         else:
+            # Recursively call add_device on the left and right subtrees
             self.left.add_device(new_device, logit_regressor)
             self.right.add_device(new_device, logit_regressor)
+
+
             
     def remove_device(self, device_index):
         if self.depth == self.max_depth:

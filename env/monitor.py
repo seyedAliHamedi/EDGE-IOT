@@ -13,7 +13,7 @@ class Monitor():
         self.config = learning_config
         self.avg_time_history = np.array([])
         self.avg_energy_history = np.array([])
-        self.avg_fail_history = np.array([0, 0, 0])
+        self.avg_fail_history = np.array([0, 0,0, 0])
         self.avg_loss_history = np.array([])
         self.avg_reward_history = np.array([])
 

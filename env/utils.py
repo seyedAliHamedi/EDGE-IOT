@@ -46,10 +46,16 @@ def extract_pe_data(pe):
     devicePower = devicePower / pe['num_cores']
 
     battery_capacity = pe['battery_capacity']
+    battery_now = pe['battery_now']
     battery_isl = pe['ISL']
-    battery = ((1 - battery_isl) * battery_capacity)
+    battery = ((battery_now/100) * battery_capacity)
+    acceptableTasks = [0,0,0,0]
+    for i in range(1,5):
+        if i in pe['acceptableTasks']:
+            acceptableTasks[i-1]=True
+            
 
-    return [devicePower, battery]
+    return [devicePower, battery,pe['handleSafeTask']]+acceptableTasks
 
 
 # REWARDS AND PUNISHMENTS
@@ -188,9 +194,6 @@ def checkBatteryDrain(energy, device):
             punish = getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
             Database().set_device_battery(device["id"], battery_end)
             
-            if battery_end < 20:
-                print(f'device: {device["id"]} b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
-            # print(f"{battery_start - battery_end} -> {punish}, energy: {energy}")
 
     return punish, batteryFail
 

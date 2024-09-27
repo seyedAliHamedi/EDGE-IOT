@@ -3,7 +3,7 @@ import numpy as np
 import torch.nn as nn
 
 from config import learning_config
-from utils import balance_kmeans_cluster
+from env.utils import balance_kmeans_cluster
 
 class ClusTree(nn.Module):
     def __init__(self, num_input, devices, depth, max_depth, counter=0, exploration_rate=0):

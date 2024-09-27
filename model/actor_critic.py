@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
@@ -9,10 +10,12 @@ from data.db import Database
 from model.trees.ClusTree import ClusTree
 from model.trees.DeviceClusTree import DeviceClusterTree
 from model.utils import get_tree, get_critic
-from utils import extract_pe_data
+from env.utils import extract_pe_data
+from sklearn.metrics import  r2_score
+from sklearn.linear_model import LinearRegression
 
 class ActorCritic(nn.Module):
-    def __init__(self,logit_regressor):
+    def __init__(self):
         super(ActorCritic, self).__init__()
         self.discount_factor = learning_config['discount_factor']
         self.actor = get_tree()  # Initialize actor
@@ -21,7 +24,7 @@ class ActorCritic(nn.Module):
         self.reset_memory()
         self.old_log_probs = {i: None for i in range(len(Database().get_all_devices()))} 
         
-        self.logit_regressor = logit_regressor
+        self.logit_regressor = LinearRegression()
 
 
     def add_new_device(self,new_device):
@@ -89,12 +92,6 @@ class ActorCritic(nn.Module):
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
         
-        # # Reshape the feature data if needed (assuming pe_data is a 1D array)
-        # pe_data = np.array(extract_pe_data(Database().get_device(action.item()))).reshape(1, -1)
-        # # Reshape the target y (pi[action.item()].detach()) into a 1D array
-        # target = np.array([pi[action.item()].detach()])
-        # # Fit the regressor
-        # self.logit_regressor.fit(pe_data, target)
         
         return action.item(), path, devices  # Return sampled action, the path, and devices
 
@@ -164,5 +161,32 @@ class ActorCritic(nn.Module):
         if self.critic:
             critic_loss = F.mse_loss(values, returns)
 
-
         return actor_loss + critic_loss
+    def update_regressor(self):
+        # Convert states to tensor
+        states = torch.tensor(self.states, dtype=torch.float)
+        
+        # Get all distributions in a single batch operation (avoiding the loop)
+        dists = torch.stack([self.actor.get_prob_dist(state)[0] for state in states], dim=0)
+        
+        # Collect device data in a batch operation
+        pe_data_batch=[]
+        for dist in dists:
+            pe_data_batch.extend(torch.tensor(
+                [extract_pe_data(Database().get_device(i)) for i in range(len(dist))],
+                dtype=torch.float32
+            ))
+        pe_data_batch = torch.stack(pe_data_batch,dim=0)
+        dists=dists.view(-1)
+
+
+        # Fit the regressor with batch data
+        # Here we reshape pe_data_batch and dists to match the expected input dimensions for LinearRegression
+        self.logit_regressor.fit(pe_data_batch.detach().cpu().numpy(), dists.detach().cpu().numpy())
+
+        # Perform predictions in a vectorized manner
+        # predictions = self.logit_regressor.predict(pe_data_batch)
+
+        # Calculate R-squared
+        # r2 = r2_score(dists.detach().cpu().numpy(), predictions)
+        

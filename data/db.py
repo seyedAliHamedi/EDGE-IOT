@@ -13,6 +13,10 @@ class Database:
             cls._instance._jobs, cls._instance._tasks = Generator.get_jobs()
             cls._instance._task_norm = cls._instance.normalize_tasks(cls._instance._tasks.copy())
         return cls._instance
+    
+    @classmethod
+    def reset(cls):
+        cls._instance = None
 
     # ------------ all ----------
 
@@ -28,10 +32,7 @@ class Database:
     # ---------- single ------------
 
     def get_device(self, id):
-        try:
-            return self._devices.loc[self._devices['id'] == id].to_dict(orient='records')[0]
-        except:
-            print(id, self._devices, id)
+        return self._devices.iloc[id].to_dict()
 
     def get_job(self, id):
         return self._jobs.iloc[id].to_dict()

@@ -12,7 +12,7 @@ from model.trees.DeviceClusTree import DeviceClusterTree
 from model.utils import get_tree, get_critic
 from env.utils import extract_pe_data
 from sklearn.metrics import  r2_score
-from sklearn.linear_model import LinearRegression
+
 
 class ActorCritic(nn.Module):
     def __init__(self):
@@ -24,11 +24,11 @@ class ActorCritic(nn.Module):
         self.reset_memory()
         self.old_log_probs = {i: None for i in range(len(Database().get_all_devices()))} 
         
-        self.logit_regressor = LinearRegression()
+
 
 
     def add_new_device(self,new_device):
-        self.actor.add_device(new_device, logit_regressor=self.logit_regressor) 
+        self.actor.add_device(new_device) 
         self.old_log_probs[len(Database().get_all_devices())-1]=None
         
     def remove_new_device(self, device_index):
@@ -162,31 +162,24 @@ class ActorCritic(nn.Module):
             critic_loss = F.mse_loss(values, returns)
 
         return actor_loss + critic_loss
+    
     def update_regressor(self):
-        # Convert states to tensor
-        states = torch.tensor(self.states, dtype=torch.float)
-        
-        # Get all distributions in a single batch operation (avoiding the loop)
-        dists = torch.stack([self.actor.get_prob_dist(state)[0] for state in states], dim=0)
-        
-        # Collect device data in a batch operation
-        pe_data_batch=[]
-        for dist in dists:
-            pe_data_batch.extend(torch.tensor(
-                [extract_pe_data(Database().get_device(i)) for i in range(len(dist))],
-                dtype=torch.float32
-            ))
-        pe_data_batch = torch.stack(pe_data_batch,dim=0)
-        dists=dists.view(-1)
+        def update_leaf_nodes(node):
+            if node.depth == node.max_depth:
+                dist = node.prob_dist
+                pe_data = torch.tensor(
+                    [extract_pe_data(Database().get_device(i)) for i in range(len(dist))],
+                    dtype=torch.float32
+                )
+                node.logit_regressor.fit(pe_data.detach().cpu().numpy(), dist.detach().cpu().numpy())
+                return
+            
+            if node.left:
+                update_leaf_nodes(node.left)
+            if node.right:
+                update_leaf_nodes(node.right)
 
+        # Start from the root actor
+        actor = self.actor
+        update_leaf_nodes(actor)
 
-        # Fit the regressor with batch data
-        # Here we reshape pe_data_batch and dists to match the expected input dimensions for LinearRegression
-        self.logit_regressor.fit(pe_data_batch.detach().cpu().numpy(), dists.detach().cpu().numpy())
-
-        # Perform predictions in a vectorized manner
-        # predictions = self.logit_regressor.predict(pe_data_batch)
-
-        # Calculate R-squared
-        # r2 = r2_score(dists.detach().cpu().numpy(), predictions)
-        

@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from config import learning_config
 from env.utils import extract_pe_data, get_input
-
+from sklearn.linear_model import LinearRegression
 class DDT(nn.Module):
     def __init__(self, num_input, num_output, depth, max_depth, counter=0, exploration_rate=0):
         """
@@ -36,7 +36,8 @@ class DDT(nn.Module):
         self.shouldExplore = learning_config['should_explore']  # Use boolean for clarity
         
         if depth == max_depth:
-            self.prob_dist = nn.Parameter(torch.ones(num_output))  # Leaf stores output probabilities
+            self.prob_dist = nn.Parameter(torch.ones(num_output))  
+            self.logit_regressor = LinearRegression()
         if depth < max_depth:
             # Initialize weights, bias, and child nodes
             self.weights = nn.Parameter(torch.empty(num_input).normal_(mean=0, std=0.1))
@@ -66,6 +67,7 @@ class DDT(nn.Module):
         else:
             left_output, left_path = self.left(x, path + "L")
             return (1 - val) * left_output, left_path
+
     def get_prob_dist(self,x):
         # Leaf node: return the probability distribution
         if self.depth == self.max_depth:
@@ -97,7 +99,7 @@ class DDT(nn.Module):
     
     
            
-    def add_device(self, new_device, logit_regressor):
+    def add_device(self, new_device):
         if self.depth == self.max_depth:
             # Get the features of the new device
             new_device_features = extract_pe_data(new_device)
@@ -106,7 +108,7 @@ class DDT(nn.Module):
             new_device_features = np.array(new_device_features).reshape(1, -1)
             
             # Predict logit using the logit regressor
-            predicted_logit = logit_regressor.predict(new_device_features)[0]
+            predicted_logit = self.logit_regressor.predict(new_device_features)[0]
 
             # Logging predicted and average logits for debugging
             avg_logit = sum(self.prob_dist) / len(self.prob_dist)
@@ -120,8 +122,8 @@ class DDT(nn.Module):
 
         else:
             # Recursively call add_device on the left and right subtrees
-            self.left.add_device(new_device, logit_regressor)
-            self.right.add_device(new_device, logit_regressor)
+            self.left.add_device(new_device)
+            self.right.add_device(new_device)
 
 
             
@@ -136,3 +138,5 @@ class DDT(nn.Module):
         else:
             self.left.remove_device(device_index)
             self.right.remove_device(device_index)
+
+    

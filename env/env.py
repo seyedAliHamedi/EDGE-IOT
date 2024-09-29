@@ -144,8 +144,7 @@ class Environment():
             loss_job.backward()
             self.optimizer.step()
             
-            if job_id % 10==0:
-                self.actor_critic.update_regressor()
+            self.actor_critic.update_regressor()
             
             self.actor_critic.reset_memory()
 

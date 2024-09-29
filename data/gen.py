@@ -31,7 +31,7 @@ class Generator:
             devices["acceptableTasks"] = devices["acceptableTasks"].apply(
                 lambda x: ast.literal_eval(x)
             )
-            Generator.device_id_counter = len(devices)-1
+            Generator.device_id_counter = len(devices) - 1
             return devices
         else:
             return Generator._generate_device()
@@ -127,12 +127,12 @@ class Generator:
         # Get the configuration for the chosen device type
         device_config = config[device_type]
 
-        cpu_cores =  int(np.random.choice(device_config["num_cores"]))
+        cpu_cores = int(np.random.choice(device_config["num_cores"]))
         # Generate the device info
         device_info = {
             "id": Generator.device_id_counter,
             "type": device_type,
-            "num_cores":cpu_cores,
+            "num_cores": cpu_cores,
             "voltages_frequencies": [
                 [
                     device_config["voltage_frequencies"][i]
@@ -161,7 +161,7 @@ class Generator:
                 if device_config["battery_capacity"] == -1
                 else np.random.uniform(
                     device_config["battery_capacity"][0], device_config["battery_capacity"][1]
-                ) * 1e3
+                ) * 1e6
             ),
             "battery_now": -1 if device_config["battery_capacity"] == -1 else 100.0,
             "error_rate": np.random.uniform(
@@ -179,7 +179,7 @@ class Generator:
             ),
             "maxQueue": device_config["maxQueue"],
         }
-        Generator.device_id_counter +=1
+        Generator.device_id_counter += 1
         return device_info
 
     @classmethod
@@ -205,9 +205,9 @@ class Generator:
         start_node_number = 1  # Keep track of task IDs across DAGs
 
         for job_id in range(config["num_jobs"]):
-            if (job_id / config["num_jobs"]*100) % 10 ==0:
-                print("Generating jobs : ",job_id / config["num_jobs"]*100,"%")
-            
+            if (job_id / config["num_jobs"] * 100) % 10 == 0:
+                print("Generating jobs : ", job_id / config["num_jobs"] * 100, "%")
+
             # Generate a random DAG for the job
             num_nodes = random.randint(config["min_num_nodes_dag"], config["max_num_nodes_dag"])
             random_dag = cls.generate_random_dag(num_nodes)

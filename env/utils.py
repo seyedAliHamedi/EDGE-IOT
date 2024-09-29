@@ -8,7 +8,6 @@ from collections import Counter
 
 # FEATURE EXTRACTION
 def get_input(task):
-
     if learning_config['onehot_kind']:
         task_features = [
             task["computational_load"],
@@ -48,14 +47,13 @@ def extract_pe_data(pe):
     battery_capacity = pe['battery_capacity']
     battery_now = pe['battery_now']
     battery_isl = pe['ISL']
-    battery = ((battery_now/100) * battery_capacity)
-    acceptableTasks = [0,0,0,0]
-    for i in range(1,5):
+    battery = ((battery_now / 100) * battery_capacity)
+    acceptableTasks = [0, 0, 0, 0]
+    for i in range(1, 5):
         if i in pe['acceptableTasks']:
-            acceptableTasks[i-1]=True
-            
+            acceptableTasks[i - 1] = True
 
-    return [devicePower, battery,pe['handleSafeTask']]+acceptableTasks
+    return [devicePower, battery, pe['handleSafeTask']] + acceptableTasks
 
 
 # REWARDS AND PUNISHMENTS
@@ -164,7 +162,7 @@ def calc_total(device, task, core, dvfs):
     return totalTime, totalEnergy
 
 
-def getBatteryPunish(b_start, b_end, alpha=100.0, beta=3.0, gamma=0.1):
+def getBatteryPunish(b_start, b_end, alpha=-100.0, beta=3.0, gamma=0.1):
     if b_start < b_end:
         raise ValueError("Final battery level must be less than or equal to the initial battery level.")
 
@@ -175,9 +173,9 @@ def getBatteryPunish(b_start, b_end, alpha=100.0, beta=3.0, gamma=0.1):
     low_battery_factor = ((100 - b_end) / 100) ** beta
 
     # Calculate the total penalty
-    penalty = -alpha * battery_drain * low_battery_factor
+    penalty = alpha * battery_drain * low_battery_factor
 
-    return -penalty
+    return penalty
 
 
 def checkBatteryDrain(energy, device):
@@ -190,10 +188,13 @@ def checkBatteryDrain(energy, device):
         battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
         if battery_end < device["ISL"] * 100:
             batteryFail = 1
+            print(device["type"], device["id"], "battery fail")
         else:
             punish = getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
             Database().set_device_battery(device["id"], battery_end)
-            
+
+            # if battery_end < 30:
+            #     print(f'device: {device["id"]} b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
 
     return punish, batteryFail
 

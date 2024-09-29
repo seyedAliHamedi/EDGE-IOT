@@ -12,7 +12,6 @@ from env.monitor import Monitor
 from env.utils import *
 
 
-
 class Environment():
     def __init__(self):
         Database().reset()
@@ -32,7 +31,7 @@ class Environment():
         pe = Database().get_device(pe_ID)
         task = Database().get_task(task_ID)
 
-        fail_flags = [0, 0,0]
+        fail_flags = [0, 0, 0]
         if task["is_safe"] and not pe['handleSafeTask']:
             # fail : assigned safe task to unsafe device
             fail_flags[0] = 1
@@ -40,22 +39,23 @@ class Environment():
             # fail : assigned a kind of task to the inappropriate device
             fail_flags[1] = 1
 
-      
         total_t, total_e = calc_total(pe, task, core_i, 0)
         reg_e = total_e
         reg_t = total_t
+
+        if sum(fail_flags) > 0:
+            return sum(fail_flags) * reward_function(punish=True), 0, 0, 0, fail_flags[1], fail_flags[0]
+
         battery_drain_punish = batteryFail = 0
         if learning_config["drain_battery"]:
-            battery_drain_punish, fail_flags[2] = checkBatteryDrain(reg_e, device=pe)
-
-        fail_flags[2] =0
-        if sum(fail_flags) > 0:
-            return sum(fail_flags) * reward_function(punish=True), 0, 0, fail_flags[2],fail_flags[1], fail_flags[0]
-
+            battery_drain_punish, fail_flags[2] = checkBatteryDrain(reg_e,pe)
+        if fail_flags[2]:
+            return reward_function(punish=True), 0, 0, 1, 0, 0
         # if self.shouldRegular:
         # reg_t = regularize_any(total_t, 1)
         # reg_e = regularize_any(total_e, 2)
-        return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, fail_flags[2],fail_flags[1], fail_flags[0]
+        return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, fail_flags[2], fail_flags[1], \
+            fail_flags[0]
 
     def add_device(self):
         # Add a new random device using the Database method
@@ -85,13 +85,13 @@ class Environment():
         print("Starting...")
         starting_time = time.time()
         for job_id in range(len(self.jobs)):
-                
+
             if job_id == 10000:
                 self.monitor.plot_histories()
                 print("scaliblity ---------")
-                
+
             # Dynamically add/remove devices
-            if learning_config['scalability'] and job_id>10000:
+            if learning_config['scalability'] and job_id > 10000:
                 if np.random.random() < learning_config['add_device_iterations']:
                     print("device Add")
                     self.add_device()
@@ -101,9 +101,9 @@ class Environment():
 
             if ((job_id / len(self.jobs)) * 100) % 10 == 0:
                 print(f"{((job_id / len(self.jobs)) * 100)}% done in {int(time.time() - starting_time)} seconds")
-                
+
             time_job = energy_job = reward_job = loss_job = 0
-            fail_job = np.array([0, 0,0, 0])
+            fail_job = np.array([0, 0, 0, 0])
             usage_job = np.array([0, 0, 0])
             path_job = []
 
@@ -120,15 +120,17 @@ class Environment():
                 selected_device = self.devices[selected_device_index]
                 core_index = 0
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
-                reward, t, e,batteryFail, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index, core_i=core_index,
-                                                                       freq=freq, volt=vol, task_ID=task_id)
+                reward, t, e, batteryFail, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,
+                                                                                    core_i=core_index,
+                                                                                    freq=freq, volt=vol,
+                                                                                    task_ID=task_id)
 
                 self.actor_critic.archive(input_state, action, reward)
 
                 reward_job += reward
                 time_job += t
                 energy_job += e
-                fails = np.array([taskFail + safeFail+batteryFail,batteryFail, taskFail, safeFail])
+                fails = np.array([taskFail + safeFail + batteryFail, batteryFail, taskFail, safeFail])
                 fail_job += fails
                 if selected_device['type'] == 'iot':
                     usage_job[0] += 1
@@ -144,10 +146,10 @@ class Environment():
             self.optimizer.zero_grad()
             loss_job.backward()
             self.optimizer.step()
-            
-            if job_id %10==0:
+
+            if job_id % 10 == 0:
                 self.actor_critic.update_regressor()
-            
+
             self.actor_critic.reset_memory()
 
         self.monitor.save_results()

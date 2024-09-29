@@ -19,7 +19,7 @@ jobs_config = {
 devices_config = {
     "iot": {
         "num_devices": 100,
-        "num_cores": [4, 8, 16],
+        "num_cores": [4],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -41,7 +41,7 @@ devices_config = {
     },
     "mec": {
         "num_devices": 50,
-        "num_cores": [16, 32, 64],
+        "num_cores": [16],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
             (750 * 1e6, 0.825),

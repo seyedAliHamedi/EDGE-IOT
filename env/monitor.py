@@ -32,11 +32,13 @@ class Monitor():
 
             "Average Loss": sum(self.avg_loss_history) / num_epoch,
             "Last Epoch Loss": self.avg_loss_history[-1],
-
+            
+            "Battery Converge": int(np.argmax(np.flip(self.avg_fail_history[:,1]) != 0)),
+            "Battery Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 1]) / len(self.avg_fail_history[:, 1]),
             "Task Converge": int(np.argmax(np.flip(self.avg_fail_history[:, 1]) != 0)),
-            "Task Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 1]) / len(self.avg_fail_history[:, 1]),
-            "Safe Converge": int(np.argmax(np.flip(self.avg_fail_history[:, 2]) != 0)),
-            "Safe Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 2]) / len(self.avg_fail_history[:, 2]),
+            "Task Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 2]) / len(self.avg_fail_history[:, 2]),
+            "Safe Converge": int(np.argmax(np.flip(self.avg_fail_history[:, 3]) != 0)),
+            "Safe Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 3]) / len(self.avg_fail_history[:, 3]),
 
             "Average Time": sum(self.avg_time_history) / num_epoch,
             "Last Epoch Time": self.avg_time_history[-1],
@@ -138,7 +140,7 @@ class Monitor():
         axs[1, 0].legend()
 
         # Plot for average fail history
-        fail_values = np.array(self.avg_fail_history)
+        fail_values = np.array(self.avg_fail_history[:,0])
         axs[1, 1].plot(fail_values, label='Average Fail',
                        color='purple', marker='o')
         axs[1, 1].set_title('Average Fail History')

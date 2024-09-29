@@ -24,6 +24,9 @@ class Generator:
                 lambda x: ast.literal_eval(x))
             devices["capacitance"] = devices["capacitance"].apply(
                 lambda x: ast.literal_eval(x)
+            )       
+            devices["occupied_cores"] = devices["occupied_cores"].apply(
+                lambda x: ast.literal_eval(x)
             )
             devices["powerIdle"] = devices["powerIdle"].apply(
                 lambda x: ast.literal_eval(x)
@@ -61,6 +64,7 @@ class Generator:
                     "id": Generator.device_id_counter,
                     "type": type,
                     "num_cores": cpu_cores,
+                    "occupied_cores":[-1 for core in range(cpu_cores)],
                     "voltages_frequencies": [
                         [
                             config["voltage_frequencies"][i]
@@ -133,6 +137,7 @@ class Generator:
             "id": Generator.device_id_counter,
             "type": device_type,
             "num_cores": cpu_cores,
+            "occupied_cores":[-1 for core in range(cpu_cores)],
             "voltages_frequencies": [
                 [
                     device_config["voltage_frequencies"][i]

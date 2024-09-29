@@ -118,7 +118,15 @@ class Environment():
                     selected_device_index = self.devices.index(devices[selected_device_index])
 
                 selected_device = self.devices[selected_device_index]
-                core_index = 0
+                core_index = -1
+                for i,core in enumerate(selected_device['occupied_cores']):
+                    if core==-1:
+                        core_index = i
+                        Database().set_core_occupied(selected_device["id"], core_index)
+                        break
+                if core_index==-1:
+                    #TODO device full
+                    print("+_+_+_+_+_+_+ DEVICE FULL __+_+_+_+_+_+_+_")
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
                 reward, t, e, batteryFail, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,
                                                                                     core_i=core_index,
@@ -139,6 +147,8 @@ class Environment():
                 if selected_device['type'] == 'cloud':
                     usage_job[2] += 1
                 path_job.append(path)
+                Database().update_core_occupied()
+                self.devices=Database().get_all_devices()
 
             loss_job = self.actor_critic.calc_loss()
             self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(tasks), path_job)

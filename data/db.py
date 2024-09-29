@@ -77,3 +77,38 @@ class Database:
 
     def set_device_battery(self, id, end):
         self._devices.loc[self._devices['id'] == id, 'battery_now'] = end
+    def set_core_occupied(self, id, core_i):
+        # Locate the row in the DataFrame corresponding to the device by 'id'
+        device_index = self._devices.index[self._devices['id'] == id].tolist()
+
+        if device_index:
+            device_index = device_index[0]  # Get the index of the first match
+            
+            # Retrieve the 'occupied_cores' list, making a copy to avoid direct modifications
+            occupied_cores = self._devices.at[device_index, 'occupied_cores'].copy()
+            
+            # Set the specified core to 1 (occupied), ensuring index is within bounds
+            if 0 <= core_i < len(occupied_cores):
+                occupied_cores[core_i] = 1
+                
+                # Update the DataFrame with the modified list
+                self._devices.at[device_index, 'occupied_cores'] = occupied_cores
+
+
+    def update_core_occupied(self):
+        # Iterate through each device
+        for idx, row in self._devices.iterrows():
+            # Get the list of occupied cores for the current device
+            occupied_cores = row['occupied_cores']
+            
+            # Increment the value of every occupied core (those not equal to -1)
+            updated_cores = [core + 1 if core != -1 else -1 for core in occupied_cores]
+
+            # Set cores back to zero if their value is greater than 5
+            updated_cores = [-1 if core > 200 else core for core in updated_cores]
+            
+            # Update the device's occupied cores
+            self._devices.at[idx, 'occupied_cores'] = updated_cores
+
+
+        

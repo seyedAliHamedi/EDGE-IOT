@@ -171,7 +171,11 @@ class ActorCritic(nn.Module):
                     [extract_pe_data(Database().get_device(i)) for i in range(len(dist))],
                     dtype=torch.float32
                 )
-                node.logit_regressor.fit(pe_data.detach().cpu().numpy(), dist.detach().cpu().numpy())
+                pred=  node.logit_regressor(pe_data)
+                loss = F.mse_loss(pred.squeeze(),dist)
+                node.logit_optimizer.zero_grad()
+                loss.backward()
+                node.logit_optimizer.step()
                 return
             
             if node.left:

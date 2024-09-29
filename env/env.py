@@ -48,6 +48,7 @@ class Environment():
         if learning_config["drain_battery"]:
             battery_drain_punish, fail_flags[2] = checkBatteryDrain(reg_e, device=pe)
 
+        fail_flags[2] =0
         if sum(fail_flags) > 0:
             return sum(fail_flags) * reward_function(punish=True), 0, 0, fail_flags[2],fail_flags[1], fail_flags[0]
 
@@ -90,7 +91,7 @@ class Environment():
                 print("scaliblity ---------")
                 
             # Dynamically add/remove devices
-            if learning_config['scalability'] and job_id > 10000:
+            if learning_config['scalability'] and job_id>10000:
                 if np.random.random() < learning_config['add_device_iterations']:
                     print("device Add")
                     self.add_device()
@@ -144,7 +145,8 @@ class Environment():
             loss_job.backward()
             self.optimizer.step()
             
-            self.actor_critic.update_regressor()
+            if job_id %10==0:
+                self.actor_critic.update_regressor()
             
             self.actor_critic.reset_memory()
 

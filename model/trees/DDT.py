@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.optim as optim
 
 from config import learning_config
 from env.utils import extract_pe_data, get_input
@@ -37,7 +38,14 @@ class DDT(nn.Module):
         
         if depth == max_depth:
             self.prob_dist = nn.Parameter(torch.ones(num_output))  
-            self.logit_regressor = LinearRegression()
+            self.logit_regressor = nn.Sequential(
+                nn.Linear(learning_config['pe_num_features'],128),
+                nn.Sigmoid(),
+                nn.Linear(128,128),
+                nn.Sigmoid(),
+                nn.Linear(128,1),
+            )
+            self.logit_optimizer = optim.Adam(self.logit_regressor.parameters(),lr=0.01)
         if depth < max_depth:
             # Initialize weights, bias, and child nodes
             self.weights = nn.Parameter(torch.empty(num_input).normal_(mean=0, std=0.1))
@@ -105,17 +113,13 @@ class DDT(nn.Module):
             new_device_features = extract_pe_data(new_device)
 
             # Ensure the features are in the right shape for the regressor (2D array)
-            new_device_features = np.array(new_device_features).reshape(1, -1)
-            
             # Predict logit using the logit regressor
-            predicted_logit = self.logit_regressor.predict(new_device_features)[0]
+            new_device_dist = self.logit_regressor(torch.tensor(new_device_features,  dtype=torch.float32))
 
             # Logging predicted and average logits for debugging
             avg_logit = sum(self.prob_dist) / len(self.prob_dist)
-            print(f"Avg Logit: {avg_logit:.4f}, Predicted Logit: {predicted_logit:.4f},")
+            print(f"Avg Logit: {avg_logit:.4f}, Predicted Logit: {new_device_dist,}")
 
-            # Convert predicted logit to a tensor
-            new_device_dist = torch.tensor([predicted_logit], dtype=torch.float32)
             
             # Concatenate the new distribution and wrap it in nn.Parameter
             self.prob_dist = nn.Parameter(torch.cat((self.prob_dist, new_device_dist)))

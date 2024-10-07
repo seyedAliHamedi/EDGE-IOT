@@ -117,7 +117,7 @@ learning_config = {
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
     "regularize_input": True,  # regularize the task/device features to feed the tree
-    "regularize_output": False,  # regularize t,e for the reward
+    "regularize_output": True,  # regularize t,e for the reward
     'pe_num_features': 7,
 
     ###### ALGORITHM #######
@@ -134,7 +134,7 @@ learning_config = {
 
     "discount_factor": 0,  # 0: reward , 0.99:return
 
-    "scalability": True,
+    "scalability": False,
     "add_device_iterations": 0.001,
     "remove_device_iterations": 0.001,
 

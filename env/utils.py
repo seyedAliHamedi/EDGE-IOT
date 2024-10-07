@@ -199,6 +199,15 @@ def checkBatteryDrain(energy, device):
     return punish, batteryFail
 
 
+def regularize_output(total_t=0,total_e=0):
+    if total_e:
+        return (total_e-Database().min_energy)/(Database().max_energy-Database().min_energy)
+    if total_t:
+        return (total_t-Database().min_time)/(Database().max_time-Database().min_time)
+    
+
+
+
 # CLUSTERING
 def balance_kmeans_cluster(devices, k=2, random_state=42):
     data = [extract_pe_data_for_clustering(device) for device in devices]

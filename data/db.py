@@ -1,7 +1,7 @@
 from data.gen import Generator
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
-
+from config import devices_config,jobs_config
 
 class Database:
     _instance = None
@@ -12,6 +12,7 @@ class Database:
             cls._instance._devices = Generator.get_devices()
             cls._instance._jobs, cls._instance._tasks = Generator.get_jobs()
             cls._instance._task_norm = cls._instance.normalize_tasks(cls._instance._tasks.copy())
+            cls._instance.min_time, cls._instance.max_time, cls._instance.min_energy, cls._instance.max_energy = cls._instance.get_min_max_time_energy()
         return cls._instance
     
     @classmethod
@@ -111,4 +112,110 @@ class Database:
             self._devices.at[idx, 'occupied_cores'] = updated_cores
 
 
-        
+    def get_min_max_time_energy(self):
+        min_time = float('inf')
+        max_time = float('-inf')
+        min_energy = float('inf')
+        max_energy = float('-inf')
+
+        for device_type, device in devices_config.items():
+            max_dvfs = max(device['voltage_frequencies'], key=lambda vf: vf[0])
+            min_dvfs = min(device['voltage_frequencies'], key=lambda vf: vf[0])
+            dvfss = [min_dvfs,max_dvfs]
+            compLoad = [min(jobs_config["task"]["computational_load"]), max(jobs_config["task"]["computational_load"])]
+            inputs = [min(jobs_config["task"]["input_size"]), max(jobs_config["task"]["input_size"])]
+            outputs = [min(jobs_config["task"]["output_size"]), max(jobs_config["task"]["output_size"])]
+            # Use the smallest and largest computational loads
+            for dvfs in dvfss:
+                for load in compLoad:
+                    for input in inputs:
+                        for output in outputs:
+                            task = {"computational_load": load,
+                                    "input_size": input,
+                                    "output_size":output}
+                            
+                            # Calculate execution time and energy
+                            total_time, total_energy = calc_total(device_type, task,dvfs)
+            
+                            min_time = min(min_time, total_time)
+                            max_time = max(max_time, total_time)
+                            min_energy = min(min_energy, total_energy)
+                            max_energy = max(max_energy, total_energy)
+        return min_time, max_time, min_energy, max_energy
+
+
+
+
+
+# FORMULAS
+def calc_execution_time(task,  dvfs):
+        return task["computational_load"] / dvfs[0]
+
+
+def calc_power_consumption(device_type, task, dvfs):
+    if device_type == "cloud":
+        return dvfs[1]
+    return (1e-9 * dvfs[1] ** 2) *dvfs[0]
+
+
+def calc_energy(device_type, task, dvfs):
+    return calc_execution_time( task,  dvfs) * calc_power_consumption(device_type, task, dvfs)
+
+
+def calc_total(device_type, task, dvfs):
+    timeTransMec = 0
+    timeTransCC = 0
+    baseTime = 0
+    baseEnergy = 0
+    totalEnergy = 0
+    totalTime = 0
+
+    transferRate5g = 1e9
+    latency5g = 5e-3
+    transferRateFiber = 1e10
+    latencyFiber = 1e-3
+
+    timeDownMec = task["output_size"] / transferRate5g
+    timeDownMec += latency5g
+    timeUpMec = task["input_size"] / transferRate5g
+    timeUpMec += latency5g
+
+    alpha = 52e-5
+    beta = 3.86412
+    powerMec = alpha * 1e9 / 1e6 + beta
+
+    timeDownCC = task["output_size"] / transferRateFiber
+    timeDownCC += latencyFiber
+    timeUpCC = task["input_size"] / transferRateFiber
+    timeUpCC += latencyFiber
+
+    powerCC = 3.65
+
+    if device_type== "mec":
+        timeTransMec = timeUpMec + timeDownMec
+        energyTransMec = powerMec * timeTransMec
+        baseTime = calc_execution_time( task,  dvfs)
+        totalTime = baseTime + timeTransMec
+        baseEnergy = calc_energy( device_type,task,  dvfs)
+        totalEnergy = baseEnergy + energyTransMec
+
+    elif device_type == "cloud":
+        timeTransMec = timeUpMec + timeDownMec
+        energyTransMec = powerMec * timeTransMec
+
+        timeTransCC = timeUpCC + timeDownCC
+        energyTransCC = powerCC * timeTransCC
+
+        baseTime = calc_execution_time( task,  dvfs)
+        totalTime = baseTime + timeTransMec + timeTransCC
+
+        baseEnergy = calc_energy( device_type,  task, dvfs)
+        totalEnergy = baseEnergy + energyTransMec + energyTransCC
+
+    elif device_type == "iot":
+        baseTime = calc_execution_time( task, dvfs)
+        totalTime = baseTime
+        baseEnergy = calc_energy( device_type, task,  dvfs)
+        totalEnergy = baseEnergy
+
+    return totalTime, totalEnergy

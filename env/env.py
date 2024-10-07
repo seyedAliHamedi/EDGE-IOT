@@ -51,9 +51,9 @@ class Environment():
             battery_drain_punish, fail_flags[2] = checkBatteryDrain(reg_e,pe)
         if fail_flags[2]:
             return reward_function(punish=True), 0, 0, 1, 0, 0
-        # if self.shouldRegular:
-        # reg_t = regularize_any(total_t, 1)
-        # reg_e = regularize_any(total_e, 2)
+        if learning_config['regularize_output']:
+            reg_t = regularize_output(total_t=total_t)
+            reg_e = regularize_output(total_e=total_e)
         return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, fail_flags[2], fail_flags[1], \
             fail_flags[0]
 
@@ -119,14 +119,14 @@ class Environment():
 
                 selected_device = self.devices[selected_device_index]
                 core_index = -1
-                for i,core in enumerate(selected_device['occupied_cores']):
-                    if core==-1:
-                        core_index = i
-                        Database().set_core_occupied(selected_device["id"], core_index)
-                        break
-                if core_index==-1:
-                    #TODO device full
-                    print("+_+_+_+_+_+_+ DEVICE FULL __+_+_+_+_+_+_+_")
+                # for i,core in enumerate(selected_device['occupied_cores']):
+                #     if core==-1:
+                #         core_index = i
+                #         Database().set_core_occupied(selected_device["id"], core_index)
+                #         break
+                # if core_index==-1:
+                #     #TODO device full
+                #     print("+_+_+_+_+_+_+ DEVICE FULL __+_+_+_+_+_+_+_")
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
                 reward, t, e, batteryFail, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,
                                                                                     core_i=core_index,
@@ -147,7 +147,7 @@ class Environment():
                 if selected_device['type'] == 'cloud':
                     usage_job[2] += 1
                 path_job.append(path)
-                Database().update_core_occupied()
+                # Database().update_core_occupied()
                 self.devices=Database().get_all_devices()
 
             loss_job = self.actor_critic.calc_loss()

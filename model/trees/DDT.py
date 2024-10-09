@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from config import learning_config
-from env.utils import extract_pe_data, get_input
+from env.utils import *
 from sklearn.linear_model import LinearRegression
 class DDT(nn.Module):
     def __init__(self, num_input, num_output, depth, max_depth, counter=0, exploration_rate=0):
@@ -28,7 +28,7 @@ class DDT(nn.Module):
         
         # Exploration parameters
         self.epsilon = learning_config['explore_epsilon']
-        num_epoch = learning_config['num_jobs']
+        num_epoch = learning_config['num_epoch']
         
         
         self.exp_mid_bound = num_epoch * self.epsilon

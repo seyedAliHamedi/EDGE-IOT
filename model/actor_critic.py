@@ -6,30 +6,26 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 from config import learning_config
-from data.db import Database
 from model.trees.ClusTree import ClusTree
-from model.trees.DeviceClusTree import DeviceClusterTree
 from model.utils import get_tree, get_critic
-from env.utils import extract_pe_data
+from env.utils import *
 from sklearn.metrics import  r2_score
 
 
 class ActorCritic(nn.Module):
-    def __init__(self):
+    def __init__(self,devices):
         super(ActorCritic, self).__init__()
         self.discount_factor = learning_config['discount_factor']
-        self.actor = get_tree()  # Initialize actor
+        self.devices=devices
+        self.actor = get_tree(self.devices)  # Initialize actor
         self.critic = get_critic()  # Critic could be None
         
         self.reset_memory()
-        self.old_log_probs = {i: None for i in range(len(Database().get_all_devices()))} 
-        
-
-
+        self.old_log_probs = {i: None for i in range(len(self.devices))} 
 
     def add_new_device(self,new_device):
         self.actor.add_device(new_device) 
-        self.old_log_probs[len(Database().get_all_devices())-1]=None
+        self.old_log_probs[len(self.devices)-1]=None
         
     def remove_new_device(self, device_index):
         # Remove the device from actor
@@ -70,13 +66,12 @@ class ActorCritic(nn.Module):
     def forward(self, x):
         # Get policy distribution and path from the actor
         # Determine if the actor is ClusTree or DDT based on its output
-        if isinstance(self.actor, ClusTree) or isinstance(self.actor, DeviceClusterTree)  :
+        if isinstance(self.actor, ClusTree)   :
             p, path,devices = self.actor(x)  # Get policy distribution and path from the actor
         else:
             p, path = self.actor(x)  # Get policy distribution and path from the actor
             devices = None  # tree does not return devices
             
-  
         v = self.critic(x) if self.critic is not None else None  # Value estimate from the critic, if applicable
         return p, path, devices, v
 
@@ -91,7 +86,6 @@ class ActorCritic(nn.Module):
         
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
-        
         
         return action.item(), path, devices  # Return sampled action, the path, and devices
 
@@ -111,7 +105,10 @@ class ActorCritic(nn.Module):
         actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
 
-    
+        # Stack the padded tensors
+        # max_length = max(p.size(0) for p in self.pis)  # Find the maximum length
+        # padded_pis = [F.pad(p, (0, max_length - p.size(0)), 'constant', 0) for p in self.pis]
+
         # Stack the padded tensors
         pis = torch.stack(self.pis, dim=0)
         probs = F.softmax(pis, dim=-1)
@@ -119,9 +116,6 @@ class ActorCritic(nn.Module):
 
         # Log probabilities of the actions taken
         new_log_probs = dist.log_prob(actions)
-        
-
-
         
         # Calculate advantages
         if self.critic is not None:
@@ -145,7 +139,6 @@ class ActorCritic(nn.Module):
             old_log_probs =torch.tensor(old_log_probs)
             
             ratio = torch.exp(new_log_probs - old_log_probs)  # Importance ratio
-            
             # update log probs
             for i, action in enumerate(actions):
                 self.old_log_probs[action.item()] = Categorical(probs[i]).log_prob(action).item()
@@ -166,9 +159,10 @@ class ActorCritic(nn.Module):
     def update_regressor(self):
         def update_leaf_nodes(node):
             if node.depth == node.max_depth:
+                devices =  node.devices if isinstance(self.actor, ClusTree) else self.devices
                 dist = node.prob_dist
                 pe_data = torch.tensor(
-                    [extract_pe_data(Database().get_device(i)) for i in range(len(dist))],
+                    [extract_pe_data(device) for device in devices],
                     dtype=torch.float32
                 )
                 pred=  node.logit_regressor(pe_data)

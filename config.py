@@ -1,5 +1,5 @@
 jobs_config = {
-    "num_jobs": 10000,
+    "num_jobs": 50000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 5,
@@ -19,7 +19,7 @@ jobs_config = {
 devices_config = {
     "iot": {
         "num_devices": 100,
-        "num_cores": [4],
+        "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -41,7 +41,7 @@ devices_config = {
     },
     "mec": {
         "num_devices": 50,
-        "num_cores": [16],
+        "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
             (750 * 1e6, 0.825),
@@ -74,17 +74,17 @@ devices_config = {
         "maxQueue": 1
     },
 }
-learning_config = {
 
+
+
+learning_config = {
+    "num_epoch": 50000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
     #    ddt :  ddt 
-    #    device-ddt :  ddt + pe features
     #    soft-ddt :  soft tree
-    #    soft-device-ddt :  soft tree + pe feature
     #    clustree : clustree 
-    #    device-clustree : clustree + pe features
 
     "tree_max_depth": 3,
 
@@ -110,29 +110,29 @@ learning_config = {
     ###### EXPLORE #######
     "should_explore": False,
     "explore_epsilon": 1e-5,
-    "num_jobs": 10000,
+    
 
-    "drain_battery": True,
+    "drain_battery": False,
 
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
     "regularize_input": True,  # regularize the task/device features to feed the tree
-    "regularize_output": True,  # regularize t,e for the reward
-    'pe_num_features': 7,
+    "regularize_output": False,  # regularize t,e for the reward
+    'pe_num_features': 2,
 
     ###### ALGORITHM #######
 
-    "learning_algorithm": "policy-grad",
+    "learning_algorithm": "ppo",
     #   policy-grad
     #   a2c
     #   ppo
 
-    "ppo_epsilon": 0.2,
+    "ppo_epsilon": 0.8,
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 128,
 
-    "discount_factor": 0,  # 0: reward , 0.99:return
+    "discount_factor": 0.0,  # 0: reward , 0.99:return
 
     "scalability": False,
     "add_device_iterations": 0.001,
@@ -142,3 +142,15 @@ learning_config = {
     "result_summery_path": './results/summery.csv',
     "result_plot_path": './results/result.png',
 }
+
+
+
+
+    # generate random Processing element attributes based on the bounds and ranges defined in the config
+
+    #   frequency in KHZ
+    #   voltage in Volt
+    #   capacitance in nano-Farad
+    #   powerIdle in Watt
+    #   ISL in percentage
+    #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W * millisecond, 10Wh or

@@ -1,11 +1,11 @@
 import os
+import time
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 from config import learning_config
-from data.db import Database
 
 
 class Monitor():
@@ -21,9 +21,21 @@ class Monitor():
         self.mec_usage = []
         self.cc_usage = []
         self.path_history = []
-
+        self.starting_time = time.time()
+        
+    def run(self,job_id):
+        
+        if job_id>0 and ((job_id / learning_config['num_epoch']) * 100) % 10 == 0:
+                print(f"{((job_id / learning_config['num_epoch']) * 100)}% done in {int(time.time() - self.starting_time)} seconds")
+                self.plot_histories()
+        
+        if job_id==learning_config['num_epoch']-2:
+            self.save_results()
+            self.plot_histories()
+            print("----------- COMPLETED------------")
+        
     def save_results(self):
-        num_epoch = len(Database().get_all_jobs())
+        num_epoch = learning_config['num_epoch']
         half_num_epoch = num_epoch // 2
 
         new_epoch_data = {

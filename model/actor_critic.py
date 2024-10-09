@@ -76,13 +76,32 @@ class ActorCritic(nn.Module):
         return p, path, devices, v
 
     # Select action based on actor's policy
-    def choose_action(self, observation):
+    def choose_action(self, observation,utilization=None):
         state = torch.tensor(observation, dtype=torch.float)
         pi, path, devices, _ = self.forward(state)
         
         self.pis.append(pi)  # Store policy distribution
 
-        probs = F.softmax(pi, dim=-1)
+        if utilization is not None:
+            utilization = torch.tensor(utilization, dtype=torch.float)  # Ensure utilization is a tensor
+        
+            # Normalize utilization to [0, 1]
+            utilization = utilization / torch.max(utilization)  # Scale to max utilization value
+
+            # Dynamic temperature adjustment based on utilization
+            # Higher utilization leads to a higher temperature
+            temperature = 1.0 + 0.3 * utilization
+            
+            # Use a more pronounced adjustment
+            pi_adjusted = pi / temperature
+            
+            # Normalize adjusted policy distribution
+            probs = F.softmax(pi_adjusted, dim=-1)
+
+        else:
+            probs = F.softmax(pi, dim=-1)
+
+            
         
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()

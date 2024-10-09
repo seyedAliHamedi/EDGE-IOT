@@ -19,6 +19,7 @@ class Environment():
         self.actor_critic = ActorCritic(devices=self.devices)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
         self.monitor = Monitor()
+        self.device_usuages = [1 for _ in range(len(self.devices))]
 
     def initialize(self):
         print("initialize Envionment")
@@ -32,6 +33,8 @@ class Environment():
         for job_id in range(learning_config['num_epoch']-1):
             self.monitor.run(job_id)
             
+            utilization = None
+            utilization = self.device_usuages
             if job_id>10000:
                 self.change_env()
 
@@ -45,7 +48,7 @@ class Environment():
                 current_task = self.tasks[task_id]
                 input_state = self.util.get_input(current_task)
                 
-                action, path, devices = self.actor_critic.choose_action(input_state)
+                action, path, devices = self.actor_critic.choose_action(input_state,utilization)
                 
                 
                 
@@ -68,7 +71,7 @@ class Environment():
                                                                                     core_i=core_index,
                                                                                     freq=freq, volt=vol,
                                                                                     task_ID=task_id)
-
+                self.device_usuages[selected_device_index] += 1
                 self.actor_critic.archive(input_state, action, reward)
 
                 reward_job += reward
@@ -85,7 +88,7 @@ class Environment():
                 path_job.append(path)
 
             loss_job = self.actor_critic.calc_loss()
-            self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(task_list), path_job)
+            self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(task_list), path_job,self.device_usuages)
 
             self.optimizer.zero_grad()
             loss_job.backward()

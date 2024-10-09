@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from config import learning_config
+from config import learning_config,devices_config
 
 
 class Monitor():
@@ -20,6 +20,7 @@ class Monitor():
         self.iot_usage = []
         self.mec_usage = []
         self.cc_usage = []
+        self.device_usage=[]
         self.path_history = []
         self.starting_time = time.time()
         
@@ -95,81 +96,62 @@ class Monitor():
         df.to_csv(learning_config['result_summery_path'], index=False)
 
     def plot_histories(self, punish=0, epsilon=0, init_explore_rate=0, explore_rate=0, exp_counter=0):
-        fig, axs = plt.subplots(3, 2, figsize=(20, 15))
+        fig = plt.figure(figsize=(20, 15))
+        gs = fig.add_gridspec(4, 2)
 
         plt.suptitle(
             f"Training History with setup {learning_config['rewardSetup']}, initial punish: {learning_config['init_punish']}, final punish: {punish}",
             fontsize=16, fontweight='bold')
 
         loss_values = self.avg_loss_history
-        axs[0, 0].plot(loss_values, label='Average Loss',
-                       color='blue', marker='o')  # Add markers for clarity
-        axs[0, 0].set_title('Average Loss History')
-        axs[0, 0].set_xlabel('Epochs')
-        axs[0, 0].set_ylabel('Loss')
-        axs[0, 0].legend()
-        axs[0, 0].grid(True)
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax1.plot(loss_values, label='Average Loss', color='blue', marker='o')  # Add markers for clarity
+        ax1.set_title('Average Loss History')
+        ax1.set_xlabel('Epochs')
+        ax1.set_ylabel('Loss')
+        ax1.legend()
+        ax1.grid(True)
 
         # Plot for average time history
         time_values = np.array(self.avg_time_history)  # Ensure data is in numpy array
-        axs[0, 1].plot(time_values, label='Average Time', color='red', marker='o')
-        axs[0, 1].set_title('Average Time History')
-        axs[0, 1].set_xlabel('Epochs')
-        axs[0, 1].set_ylabel('Time')
-        axs[0, 1].legend()
-        axs[0, 1].grid(True)
-
-        time_lower_bound = 0.00625
-        time_middle_bound = 0.0267
-        time_upper_bound = 1
-        # axs[0, 1].axhline(y=time_lower_bound, color='blue',
-        #                   linestyle='--', label='Lower Bound (0.00625)')
-        # axs[0, 1].axhline(y=time_middle_bound, color='green',
-        #                   linestyle='--', label='Middle Bound (0.0267)')
-        # axs[0, 1].axhline(y=time_upper_bound, color='red',
-        #                   linestyle='--', label='Upper Bound (1)')
-        axs[0, 1].legend()
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax2.plot(time_values, label='Average Time', color='red', marker='o')
+        ax2.set_title('Average Time History')
+        ax2.set_xlabel('Epochs')
+        ax2.set_ylabel('Time')
+        ax2.legend()
+        ax2.grid(True)
 
         # Plot for average energy history
         energy_values = np.array(self.avg_energy_history)
-        axs[1, 0].plot(energy_values, label='Average Energy',
-                       color='green', marker='o')
-        axs[1, 0].set_title('Average Energy History')
-        axs[1, 0].set_xlabel('Epochs')
-        axs[1, 0].set_ylabel('Energy')
-        axs[1, 0].legend()
-        axs[1, 0].grid(True)
-
-        energy_lower_bound = 0.0000405
-        energy_middle_bound = 0.100746
-        energy_upper_bound = 1.2
-        # axs[1, 0].axhline(y=energy_lower_bound, color='blue',
-        #                   linestyle='--', label='Lower Bound (0.0000405)')
-        # axs[1, 0].axhline(y=energy_middle_bound, color='green',
-        #                   linestyle='--', label='Middle Bound (0.100746)')
-        # axs[1, 0].axhline(y=energy_upper_bound, color='red',
-        #                   linestyle='--', label='Upper Bound (1.2)')
-        axs[1, 0].legend()
+        ax3 = fig.add_subplot(gs[1, 0])
+        ax3.plot(energy_values, label='Average Energy', color='green', marker='o')
+        ax3.set_title('Average Energy History')
+        ax3.set_xlabel('Epochs')
+        ax3.set_ylabel('Energy')
+        ax3.legend()
+        ax3.grid(True)
 
         # Plot for average fail history
-        fail_values = np.array(self.avg_fail_history[:,0])
-        axs[1, 1].plot(fail_values, label='Average Fail',
-                       color='purple', marker='o')
-        axs[1, 1].set_title('Average Fail History')
-        axs[1, 1].set_xlabel('Epochs')
-        axs[1, 1].set_ylabel('Fail Count')
-        axs[1, 1].legend()
-        axs[1, 1].grid(True)
+        fail_values = np.array(self.avg_fail_history[:, 0])
+        ax4 = fig.add_subplot(gs[1, 1])
+        ax4.plot(fail_values, label='Average Fail', color='purple', marker='o')
+        ax4.set_title('Average Fail History')
+        ax4.set_xlabel('Epochs')
+        ax4.set_ylabel('Fail Count')
+        ax4.legend()
+        ax4.grid(True)
 
         # Plot for devices usage history
-        axs[2, 0].plot(self.iot_usage, label='IoT Usage', color='blue', marker='o')
-        axs[2, 0].plot(self.mec_usage, label='MEC Usage', color='orange', marker='x')
-        axs[2, 0].plot(self.cc_usage, label='Cloud Usage', color='green', marker='s')
-        axs[2, 0].set_title('Devices Usage History')
-        axs[2, 0].set_xlabel('Epochs')
-        axs[2, 0].set_ylabel('Usage')
-        axs[2, 0].legend()
-        axs[2, 0].grid(True)
+        ax5 = fig.add_subplot(gs[2, 0])
+        ax5.plot(self.iot_usage, label='IoT Usage', color='blue', marker='o')
+        ax5.plot(self.mec_usage, label='MEC Usage', color='orange', marker='x')
+        ax5.plot(self.cc_usage, label='Cloud Usage', color='green', marker='s')
+        ax5.set_title('Devices Usage History')
+        ax5.set_xlabel('Epochs')
+        ax5.set_ylabel('Usage')
+        ax5.legend()
+        ax5.grid(True)
 
         # Heatmap for path history
         output_classes = ["LLL", "LLR", "LRL", "LRR", "RLL", "RLR", "RRL", "RRR"]
@@ -177,22 +159,31 @@ class Monitor():
 
         for epoch in range(len(self.path_history)):
             epoch_paths = self.path_history[epoch]
-
             for path in epoch_paths:
                 path_index = output_classes.index(path)
                 path_counts[epoch, path_index] += 1
-        sns.heatmap(path_counts, cmap="YlGnBu",
-                    xticklabels=output_classes, ax=axs[2, 1])
-        axs[2, 1].set_title(
+
+        ax6 = fig.add_subplot(gs[2, 1])
+        sns.heatmap(path_counts, cmap="YlGnBu", xticklabels=output_classes, ax=ax6)
+        ax6.set_title(
             f"Path History Heatmap - All Epochs\n(r: {learning_config['rewardSetup']}, p: {learning_config['init_punish']}, ep: {epsilon}, exp_rate: {init_explore_rate:.5f} - {explore_rate:.5f}, exp_times: {exp_counter})")
-        axs[2, 1].set_xlabel('Output Classes')
-        axs[2, 1].set_ylabel('Epochs')
+        ax6.set_xlabel('Output Classes')
+        ax6.set_ylabel('Epochs')
+
+        # Plot for device usage history in a single row
+        ax7 = fig.add_subplot(gs[3, :])  # Span across both columns
+        colors = ['blue'] *  devices_config['iot']['num_devices'] + ['orange'] *  devices_config['mec']['num_devices'] + ['green'] * devices_config['cloud']['num_devices']
+        ax7.bar(range(1, len(self.device_usage) + 1), self.device_usage, color=colors)
+        ax7.set_title('PE ACTIVITY History')
+        ax7.set_xlabel('Device')
+        ax7.set_yticks([]) 
+        ax7.set_xticks(range(1, len(self.device_usage) + 1)) 
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig(learning_config['result_plot_path'])
 
     def update(self, time_epoch, energy_epoch, reward_epoch, loss_epoch, fail_epoch, usage_epoch, num_episodes,
-               path_job):
+               path_job,device_usuage):
 
         avg_time = time_epoch / num_episodes
         avg_energy = energy_epoch / num_episodes
@@ -211,3 +202,4 @@ class Monitor():
         self.mec_usage.append(usage_epoch[1])
         self.cc_usage.append(usage_epoch[2])
         self.path_history.append(path_job)
+        self.device_usage = device_usuage

@@ -4,25 +4,27 @@ from config import learning_config
 from config import jobs_config
 
 
-
-
 class Utility:
-    def __init__(self,devices):
-        self.devices=devices
+    def __init__(self, devices):
+        self.devices = devices
         self.min_time, self.max_time, self.min_energy, self.max_energy = self.get_min_max_time_energy()
-    
+
     # FEATURE EXTRACTION
-    def get_input(self,task):
-    
-        if learning_config['regularize_input'] :
-            compLoad = [min(jobs_config["task"]["computational_load"])*1e6, max(jobs_config["task"]["computational_load"])*1e6]
-            inputs = [min(jobs_config["task"]["input_size"])*1e6, max(jobs_config["task"]["input_size"])*1e6]
-            outputs = [min(jobs_config["task"]["output_size"])*1e6, max(jobs_config["task"]["output_size"])*1e6]
+    def get_input(self, task):
+
+        if learning_config['regularize_input']:
+            compLoad = [min(jobs_config["task"]["computational_load"]) * 1e6,
+                        max(jobs_config["task"]["computational_load"]) * 1e6]
+            inputs = [min(jobs_config["task"]["input_size"]) * 1e6, max(jobs_config["task"]["input_size"]) * 1e6]
+            outputs = [min(jobs_config["task"]["output_size"]) * 1e6, max(jobs_config["task"]["output_size"]) * 1e6]
             task_features = [
-                (task["computational_load"]-compLoad[0])/(compLoad[1]-compLoad[0]),
-                (task["input_size"]-inputs[0])/(inputs[1]-inputs[0]),
-                (task["output_size"]-outputs[0])/(outputs[1]-outputs[0]),
+                (task["computational_load"] - compLoad[0]) / (compLoad[1] - compLoad[0]),
+                (task["input_size"] - inputs[0]) / (inputs[1] - inputs[0]),
+                (task["output_size"] - outputs[0]) / (outputs[1] - outputs[0]),
                 task["is_safe"],
+                task["iot_predecessors"],
+                task["mec_predecessors"],
+                task["cloud_predecessors"]
             ]
         else:
             task_features = [
@@ -31,13 +33,13 @@ class Utility:
                 task["output_size"],
                 task["is_safe"],
             ]
-            
+
         if learning_config['onehot_kind']:
             task_features.extend([
-                1 if task["task_kind"]==1 else 0,
-                1 if task["task_kind"]==2 else 0,
-                1 if task["task_kind"]==3 else 0,
-                1 if task["task_kind"]==4 else 0,
+                1 if task["task_kind"] == 1 else 0,
+                1 if task["task_kind"] == 2 else 0,
+                1 if task["task_kind"] == 3 else 0,
+                1 if task["task_kind"] == 4 else 0,
             ])
         else:
             task_features.extend([
@@ -45,39 +47,39 @@ class Utility:
             ])
         return task_features
 
-           
     def get_min_max_time_energy(self):
         min_time = float('inf')
         max_time = float('-inf')
         min_energy = float('inf')
         max_energy = float('-inf')
-        
-    
+
         # Use the smallest and largest computational loads
         for device in self.devices:
-            for core_index,core in enumerate(device['voltages_frequencies']):
-                for dvfs_index,dvfs in enumerate(device['voltages_frequencies'][core_index]):
-                    compLoad = [min(jobs_config["task"]["computational_load"])*1e6, max(jobs_config["task"]  ["computational_load"])*1e6]
-                    inputs = [min(jobs_config["task"]["input_size"])*1e6, max(jobs_config["task"]["input_size"])*1e6]
-                    outputs = [min(jobs_config["task"]["output_size"])*1e6, max(jobs_config["task"]["output_size"])*1e6]
+            for core_index, core in enumerate(device['voltages_frequencies']):
+                for dvfs_index, dvfs in enumerate(device['voltages_frequencies'][core_index]):
+                    compLoad = [min(jobs_config["task"]["computational_load"]) * 1e6,
+                                max(jobs_config["task"]["computational_load"]) * 1e6]
+                    inputs = [min(jobs_config["task"]["input_size"]) * 1e6,
+                              max(jobs_config["task"]["input_size"]) * 1e6]
+                    outputs = [min(jobs_config["task"]["output_size"]) * 1e6,
+                               max(jobs_config["task"]["output_size"]) * 1e6]
                     for load in compLoad:
                         for input in inputs:
                             for output in outputs:
                                 task = {"computational_load": load,
                                         "input_size": input,
-                                        "output_size":output}
-                                
+                                        "output_size": output}
+
                                 # Calculate execution time and energy
-                                total_time, total_energy = calc_total(device, task,core_index,dvfs_index)
-                
+                                total_time, total_energy = calc_total(device, task, [], core_index, dvfs_index)
+
                                 min_time = min(min_time, total_time)
                                 max_time = max(max_time, total_time)
                                 min_energy = min(min_energy, total_energy)
                                 max_energy = max(max_energy, total_energy)
         return min_time, max_time, min_energy, max_energy
 
-
-    def getBatteryPunish(self,b_start, b_end, alpha=-100.0, beta=3.0, gamma=0.1):
+    def getBatteryPunish(self, b_start, b_end, alpha=-100.0, beta=3.0, gamma=0.1):
         if b_start < b_end:
             raise ValueError("Final battery level must be less than or equal to the initial battery level.")
 
@@ -92,8 +94,7 @@ class Utility:
 
         return penalty
 
-
-    def checkBatteryDrain(self,energy, device):
+    def checkBatteryDrain(self, energy, device):
         punish = 0
         batteryFail = 0
 
@@ -106,23 +107,23 @@ class Utility:
                 print(device["type"], "battery fail")
             else:
                 punish = self.getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
-                device['live_state']["battery_now"]=battery_end
+                device['live_state']["battery_now"] = battery_end
 
         return punish, batteryFail
 
-
-    def regularize_output(self,total_t=0,total_e=0):
+    def regularize_output(self, total_t=0, total_e=0):
         if total_e:
-            return (total_e-self.min_energy)/(self.max_energy-self.min_energy)
+            return (total_e - self.min_energy) / (self.max_energy - self.min_energy)
         if total_t:
-            return (total_t-self.min_time)/(self.max_time-self.min_time)
- 
+            return (total_t - self.min_time) / (self.max_time - self.min_time)
+
     def extract_all_pe_features(self):
-        pe_features =[]
+        pe_features = []
         for pe in self.devices:
             pe_features.extend(extract_pe_data(pe))
         return pe_features
-    
+
+
 def extract_pe_data(pe):
     # TODO : regularize
     # devicePower = 0
@@ -140,7 +141,7 @@ def extract_pe_data(pe):
             acceptable_tasks[i - 1] = 1
 
     # return [battery_now /100, pe['is_safe']] + acceptable_tasks
-    return [battery_now /100, pe['is_safe']] 
+    return [battery_now / 100, pe['is_safe']]
 
 
 # FORMULAS
@@ -159,60 +160,102 @@ def calc_energy(device, task, core, dvfs):
     return calc_execution_time(device, task, core, dvfs) * calc_power_consumption(device, task, core, dvfs)
 
 
-def calc_total(device, task, core, dvfs):
-    timeTransMec = 0
-    timeTransCC = 0
-    baseTime = 0
-    baseEnergy = 0
-    totalEnergy = 0
-    totalTime = 0
-
+def pred_cost(task_pres, device):
     transferRate5g = 1e9
     latency5g = 5e-3
     transferRateFiber = 1e10
     latencyFiber = 1e-3
-    timeDownMec = task["output_size"] / transferRate5g
-    timeDownMec += latency5g
-    timeUpMec = task["input_size"] / transferRate5g
-    timeUpMec += latency5g
-
     alpha = 52e-5
     beta = 3.86412
     powerMec = alpha * 1e9 / 1e6 + beta
-
-    timeDownCC = task["output_size"] / transferRateFiber
-    timeDownCC += latencyFiber
-    timeUpCC = task["input_size"] / transferRateFiber
-    timeUpCC += latencyFiber
-
     powerCC = 3.65
 
-    if device["type"] == "mec":
-        timeTransMec = timeUpMec + timeDownMec
-        energyTransMec = powerMec * timeTransMec
-        baseTime = calc_execution_time(device, task, core, dvfs)
-        totalTime = baseTime + timeTransMec
-        baseEnergy = calc_energy(device, task, core, dvfs)
-        totalEnergy = baseEnergy + energyTransMec
+    inf_pairs = []
+    costs = []
+    device_type = device["type"]
+    for pre in task_pres:
+        inf_pairs.append((pre["chosen_device_type"], pre["output_size"]))
 
-    elif device["type"] == "cloud":
-        timeTransMec = timeUpMec + timeDownMec
-        energyTransMec = powerMec * timeTransMec
+    for pair in inf_pairs:
+        if pair[0] == device_type:
+            costs.append((0, 0))
+        else:
+            if (pair[0] == "mec" and device_type == "iot") or (pair[0] == "iot" and device_type == "mec"):
+                time = pair[1] / transferRate5g + latency5g
+                costs.append((time, time * powerMec))
 
-        timeTransCC = timeUpCC + timeDownCC
-        energyTransCC = powerCC * timeTransCC
+            elif (pair[0] == "mec" and device_type == "cloud") or (pair[0] == "cloud" and device_type == "mec"):
+                time = pair[1] / transferRateFiber + latencyFiber
+                costs.append((time, time * powerCC))
 
-        baseTime = calc_execution_time(device, task, core, dvfs)
-        totalTime = baseTime + timeTransMec + timeTransCC
+            elif (pair[0] == "cloud" and device_type == "iot") or (pair[0] == "iot" and device_type == "cloud"):
+                time = (pair[1] / transferRate5g + latency5g) + (pair[1] / transferRateFiber + latencyFiber)
+                energy = ((pair[1] / transferRate5g + latency5g) * powerMec) + (
+                            (pair[1] / transferRateFiber + latencyFiber) * powerCC)
+                costs.append((time, energy))
 
-        baseEnergy = calc_energy(device, task, core, dvfs)
-        totalEnergy = baseEnergy + energyTransMec + energyTransCC
+    max_t = max(costs, key=lambda x: x[0])[0]
+    sum_e = sum(e for _, e in costs)
+    return max_t, sum_e
 
-    elif device["type"] == "iot":
-        baseTime = calc_execution_time(device, task, core, dvfs)
-        totalTime = baseTime
-        baseEnergy = calc_energy(device, task, core, dvfs)
-        totalEnergy = baseEnergy
+
+def calc_total(device, task, task_pres, core, dvfs):
+    timeTransMec = 0
+    timeTransCC = 0
+
+    predecessors_time_cost = predecessors_energy_cost = 0
+    totalTime = calc_execution_time(device, task, core, dvfs)
+    totalEnergy = calc_energy(device, task, core, dvfs)
+
+    if learning_config["transmission_calc_type"]:
+
+        transferRate5g = 1e9
+        latency5g = 5e-3
+        transferRateFiber = 1e10
+        latencyFiber = 1e-3
+        timeDownMec = task["output_size"] / transferRate5g
+        timeDownMec += latency5g
+        timeUpMec = task["input_size"] / transferRate5g
+        timeUpMec += latency5g
+
+        alpha = 52e-5
+        beta = 3.86412
+        powerMec = alpha * 1e9 / 1e6 + beta
+
+        timeDownCC = task["output_size"] / transferRateFiber
+        timeDownCC += latencyFiber
+        timeUpCC = task["input_size"] / transferRateFiber
+        timeUpCC += latencyFiber
+
+        powerCC = 3.65
+
+        if device["type"] == "mec":
+            timeTransMec = timeUpMec + timeDownMec
+            energyTransMec = powerMec * timeTransMec
+            totalTime += timeTransMec
+            totalEnergy += energyTransMec
+
+        elif device["type"] == "cloud":
+            timeTransMec = timeUpMec + timeDownMec
+            energyTransMec = powerMec * timeTransMec
+
+            timeTransCC = timeUpCC + timeDownCC
+            energyTransCC = powerCC * timeTransCC
+
+            totalTime += timeTransMec + timeTransCC
+
+            totalEnergy += energyTransMec + energyTransCC
+
+        # elif device["type"] == "iot":
+        #     baseTime = calc_execution_time(device, task, core, dvfs)
+        #     totalTime = baseTime
+        #     baseEnergy = calc_energy(device, task, core, dvfs)
+        #     totalEnergy = baseEnergy
+
+    if len(task_pres) > 0:
+        predecessors_time_cost, predecessors_energy_cost = pred_cost(task_pres, device)
+    totalTime += predecessors_time_cost
+    totalEnergy += predecessors_energy_cost
 
     return totalTime, totalEnergy
 
@@ -243,4 +286,3 @@ def reward_function(e=0, t=0, punish=0):
         return -np.log(alpha * e + beta * t)
     elif setup == 7:
         return -((alpha * e + beta * t) ** 2)
-

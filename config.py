@@ -1,5 +1,5 @@
 jobs_config = {
-    "num_jobs": 50000,
+    "num_jobs": 30000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 5,
@@ -11,7 +11,7 @@ jobs_config = {
         "safe_measurement": [0.5, 0.5],
         "task_kinds": [1, 2, 3, 4]
     },
-    "max_num_parents_dag": 1,
+    "max_num_parents_dag": 2,
     "min_num_nodes_dag": 4,
     "max_num_nodes_dag": 16
 }
@@ -75,10 +75,8 @@ devices_config = {
     },
 }
 
-
-
 learning_config = {
-    "num_epoch": 50000,
+    "num_epoch": 20000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
@@ -110,7 +108,6 @@ learning_config = {
     ###### EXPLORE #######
     "should_explore": False,
     "explore_epsilon": 1e-5,
-    
 
     "drain_battery": False,
 
@@ -138,23 +135,22 @@ learning_config = {
     "add_device_iterations": 0.001,
     "remove_device_iterations": 0.001,
 
-    "utilization": True,
+    "utilization": False,
     "utilization_eps": 1e-4,
-    
+
+    "transmission_calc_type": 0,
+
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',
     "result_plot_path": './results/result.png',
-    "checkpoint_file_path":"./results/checkpoints/model.pth"
+    "checkpoint_file_path": "./results/checkpoints/model.pth"
 }
 
+# generate random Processing element attributes based on the bounds and ranges defined in the config
 
-
-
-    # generate random Processing element attributes based on the bounds and ranges defined in the config
-
-    #   frequency in KHZ
-    #   voltage in Volt
-    #   capacitance in nano-Farad
-    #   powerIdle in Watt
-    #   ISL in percentage
-    #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W * millisecond, 10Wh or
+#   frequency in KHZ
+#   voltage in Volt
+#   capacitance in nano-Farad
+#   powerIdle in Watt
+#   ISL in percentage
+#   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W * millisecond, 10Wh or

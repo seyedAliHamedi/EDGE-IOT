@@ -8,7 +8,6 @@ from config import devices_config, jobs_config
 
 
 class Generator:
-
     # File paths for device, job, and task data
     devices_path = os.path.join(os.path.dirname(__file__), "resources", "devices.csv")
     job_path = os.path.join(os.path.dirname(__file__), "resources", "jobs.csv")
@@ -18,14 +17,15 @@ class Generator:
     def get_devices(cls):
         devices = cls._load_csv(cls.devices_path, cls.generate_devices)
         for device in devices:
-            device['live_state']={}
+            device['live_state'] = {}
             device['live_state']['battery_now'] = -1 if device["battery_capacity"] == -1 else 100.0
             device['live_state']['occupied_cores'] = [-1 for _ in range(device['num_cores'])]
         return devices
-    
+
     @classmethod
     def get_jobs(cls):
         return cls._load_csv(cls.job_path, cls.generate_jobs)
+
     @classmethod
     def get_tasks(cls):
         return cls._load_csv(cls.tasks_path, cls.generate_jobs)
@@ -50,7 +50,8 @@ class Generator:
 
             for node in random_dag.nodes:
                 parents = list(random_dag.predecessors(node))
-                task_info = cls._generate_task_info(node,parents, job_id, task_config)
+                children = list(random_dag.successors(node))
+                task_info = cls._generate_task_info(node, parents, children, job_id, task_config)
                 tasks_data.append(task_info)
 
             start_node_number += num_nodes
@@ -67,14 +68,14 @@ class Generator:
         pd.DataFrame(tasks_data).to_csv(cls.tasks_path, index=False)
         return jobs_data, tasks_data
 
-
     @classmethod
     def generate_devices(cls):
         devices_data = []
         for device_type in ("iot", "mec", "cloud"):
             config = devices_config[device_type]
             for _ in range(config["num_devices"]):
-                cpu_cores = config['num_cores'] if device_type == 'cloud' else int(np.random.choice(config["num_cores"]))
+                cpu_cores = config['num_cores'] if device_type == 'cloud' else int(
+                    np.random.choice(config["num_cores"]))
                 device_info = cls._generate_device_info(device_type, cpu_cores, config)
                 devices_data.append(device_info)
 
@@ -88,10 +89,11 @@ class Generator:
         return {
             "type": device_type,
             "num_cores": cpu_cores,
-            "voltages_frequencies":   [ [config["voltage_frequencies"][i]
-                for i in np.random.choice(len(config['voltage_frequencies']), size=3, replace=False)]
-                for _ in range(cpu_cores)
-            ],
+            "voltages_frequencies": [[config["voltage_frequencies"][i]
+                                      for i in
+                                      np.random.choice(len(config['voltage_frequencies']), size=3, replace=False)]
+                                     for _ in range(cpu_cores)
+                                     ],
             "ISL": cls._generate_value(config["isl"]),
             "capacitance": np.random.uniform(*config["capacitance"]) * 1e-9,
             "powerIdle": float(np.random.choice(config["powerIdle"])) * 1e-6,
@@ -109,16 +111,22 @@ class Generator:
         return -1 if value_config == -1 else np.random.uniform(value_config[0], value_config[1])
 
     @classmethod
-    def _generate_task_info(cls,id, parents, job_id, task_config):
+    def _generate_task_info(cls, id, parents, children,  job_id, task_config):
         return {
-            "id":id,
+            "id": id,
             "job_id": job_id,
             "predecessors": parents,
+            "successors": children,
             "computational_load": np.random.randint(*task_config["computational_load"]) * 1e6,
             "input_size": np.random.randint(*task_config["input_size"]) * 1e6,
             "output_size": np.random.randint(*task_config["output_size"]) * 1e6,
             "task_kind": np.random.choice(task_config["task_kinds"]),
-            "is_safe": np.random.choice([0, 1], p=[task_config["safe_measurement"][0], task_config["safe_measurement"][1]]),
+            "is_safe": np.random.choice([0, 1],
+                                        p=[task_config["safe_measurement"][0], task_config["safe_measurement"][1]]),
+            "chosen_device_type": "None",
+            "iot_predecessors": 0,
+            "mec_predecessors": 0,
+            "cloud_predecessors": 0
         }
 
     @staticmethod
@@ -145,12 +153,13 @@ class Generator:
             df["tasks_ID"] = df["tasks_ID"].apply(lambda x: ast.literal_eval(x))
         if 'predecessors' in df.columns:
             df["predecessors"] = df["predecessors"].apply(lambda x: ast.literal_eval(x))
+        if 'successors' in df.columns:
+            df["successors"] = df["successors"].apply(lambda x: ast.literal_eval(x))
         if 'voltages_frequencies' in df.columns:
             df["voltages_frequencies"] = df["voltages_frequencies"].apply(lambda x: ast.literal_eval(x))
         if 'acceptable_tasks' in df.columns:
             df["acceptable_tasks"] = df["acceptable_tasks"].apply(lambda x: ast.literal_eval(x))
         return df.to_dict(orient='records')
-
 
     @classmethod
     def generate_random_device(cls):
@@ -160,10 +169,11 @@ class Generator:
         device = {
             "type": device_type,
             "num_cores": cpu_cores,
-            "voltages_frequencies":   [ [device_config["voltage_frequencies"][i]
-                for i in np.random.choice(len(device_config['voltage_frequencies']), size=3, replace=False)]
-                for _ in range(cpu_cores)
-            ],
+            "voltages_frequencies": [[device_config["voltage_frequencies"][i]
+                                      for i in np.random.choice(len(device_config['voltage_frequencies']), size=3,
+                                                                replace=False)]
+                                     for _ in range(cpu_cores)
+                                     ],
             "ISL": cls._generate_value(device_config["isl"]),
             "capacitance": np.random.uniform(*device_config["capacitance"]) * 1e-9,
             "powerIdle": float(np.random.choice(device_config["powerIdle"])) * 1e-6,
@@ -174,7 +184,7 @@ class Generator:
                                                       replace=False)),
             "is_safe": int(np.random.choice([0, 1], p=[device_config["safe"][0], device_config["safe"][1]])),
         }
-        device['live_state']={}
+        device['live_state'] = {}
         device['live_state']['battery_now'] = -1 if device["battery_capacity"] == -1 else 100.0
         device['live_state']['occupied_cores'] = [-1 for _ in range(device['num_cores'])]
         return device

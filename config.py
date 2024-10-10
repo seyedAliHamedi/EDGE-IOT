@@ -130,7 +130,7 @@ learning_config = {
     "ppo_epsilon": 0.8,
 
     "critic_hidden_layer_num": 1,
-    "critic_hidden_layer_dim": 128,
+    "critic_hidden_layer_dim": 256,
 
     "discount_factor": 0.0,  # 0: reward , 0.99:return
 
@@ -138,9 +138,13 @@ learning_config = {
     "add_device_iterations": 0.001,
     "remove_device_iterations": 0.001,
 
+    "utilization": True,
+    "utilization_eps": 1e-4,
+    
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',
     "result_plot_path": './results/result.png',
+    "checkpoint_file_path":"./results/checkpoints/model.pth"
 }
 
 

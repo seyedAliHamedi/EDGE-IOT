@@ -1,3 +1,5 @@
+from collections import deque
+import os
 import time
 import numpy as np
 import pandas as pd
@@ -19,7 +21,7 @@ class Environment():
         self.actor_critic = ActorCritic(devices=self.devices)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
         self.monitor = Monitor()
-        self.device_usuages = [1 for _ in range(len(self.devices))]
+        self.device_usuages = [deque(maxlen=1000) for i in range(len(self.devices))]
 
     def initialize(self):
         print("initialize Envionment")
@@ -27,16 +29,29 @@ class Environment():
         self.jobs = Generator.get_jobs()
         self.tasks  = Generator.get_tasks()
         print("Data loaded")
-            
+   
+    def save_models(self):
+        print('... saving models ...')
+        checkpoint = {
+            'model_state_dict': self.actor_critic.state_dict(),
+        }
+        os.makedirs(os.path.dirname(self.actor_critic.checkpoint_file), exist_ok=True) 
+        torch.save(checkpoint, self.actor_critic.checkpoint_file)
+
+    def load_models(self):
+        print('... loading models ...')
+        checkpoint = torch.load(self.actor_critic.checkpoint_file)
+        self.actor_critic.load_state_dict(checkpoint['model_state_dict'])
+        
     def run(self):
         print("Starting...")
         for job_id in range(learning_config['num_epoch']-1):
             self.monitor.run(job_id)
             
             utilization = None
-            utilization = self.device_usuages
             if job_id>10000:
                 self.change_env()
+                utilization = [sum(usage) for usage in  self.device_usuages]
 
             time_job = energy_job = reward_job = loss_job = 0
             fail_job = np.array([0, 0, 0, 0])
@@ -71,7 +86,13 @@ class Environment():
                                                                                     core_i=core_index,
                                                                                     freq=freq, volt=vol,
                                                                                     task_ID=task_id)
-                self.device_usuages[selected_device_index] += 1
+                for i,_ in enumerate(self.device_usuages):
+                    if i == selected_device_index:
+                        self.device_usuages[i].append(1)
+                    else:
+                        self.device_usuages[i].append(0)
+                        
+                        
                 self.actor_critic.archive(input_state, action, reward)
 
                 reward_job += reward
@@ -88,7 +109,7 @@ class Environment():
                 path_job.append(path)
 
             loss_job = self.actor_critic.calc_loss()
-            self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(task_list), path_job,self.device_usuages)
+            self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(task_list), path_job,[sum(usage) for usage in  self.device_usuages])
 
             self.optimizer.zero_grad()
             loss_job.backward()
@@ -96,11 +117,16 @@ class Environment():
 
             if job_id % 10 == 0:
                 self.actor_critic.update_regressor()
+            
+            
+            # if job_id % 1000 ==0:
+            #     self.save_models()
+            #     self.load_models()
 
             self.actor_critic.reset_memory()
 
         
-
+   
     def change_env(self):
         if learning_config['scalability'] :
             if np.random.random() < learning_config['add_device_iterations']:

@@ -19,7 +19,7 @@ class ActorCritic(nn.Module):
         self.devices=devices
         self.actor = get_tree(self.devices)  # Initialize actor
         self.critic = get_critic()  # Critic could be None
-        
+        self.checkpoint_file = learning_config['checkpoint_file_path']
         self.reset_memory()
         self.old_log_probs = {i: None for i in range(len(self.devices))} 
 
@@ -48,8 +48,9 @@ class ActorCritic(nn.Module):
         
         # Replace the old log probs with the updated one
         self.old_log_probs = updated_log_probs
+        self.utilization_factor = 0.5 
 
-        
+
         
         
     # Store experiences in memory
@@ -82,7 +83,7 @@ class ActorCritic(nn.Module):
         
         self.pis.append(pi)  # Store policy distribution
 
-        if utilization is not None:
+        if utilization is not None and learning_config['utilization']:
             utilization = torch.tensor(utilization, dtype=torch.float)  # Ensure utilization is a tensor
         
             # Normalize utilization to [0, 1]
@@ -90,7 +91,12 @@ class ActorCritic(nn.Module):
 
             # Dynamic temperature adjustment based on utilization
             # Higher utilization leads to a higher temperature
-            temperature = 1.0 + 0.3 * utilization
+            
+            temperature = 1.0 + self.utilization_factor * utilization
+            if self.utilization_factor >= 0.5 and self.utilization_factor <=1:
+                self.utilization_factor += learning_config['utilization_eps']
+            if self.utilization_factor == 1:
+                learning_config['utilization_eps'] = -1*learning_config['utilization_eps']
             
             # Use a more pronounced adjustment
             pi_adjusted = pi / temperature

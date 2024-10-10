@@ -22,6 +22,7 @@ class ActorCritic(nn.Module):
         self.checkpoint_file = learning_config['checkpoint_file_path']
         self.reset_memory()
         self.old_log_probs = {i: None for i in range(len(self.devices))} 
+        self.utilization_factor = 0.5 
 
     def add_new_device(self,new_device):
         self.actor.add_device(new_device) 
@@ -48,7 +49,7 @@ class ActorCritic(nn.Module):
         
         # Replace the old log probs with the updated one
         self.old_log_probs = updated_log_probs
-        self.utilization_factor = 0.5 
+        
 
 
         

@@ -9,7 +9,7 @@ from config import devices_config, jobs_config
 
 class Generator:
     # File paths for device, job, and task data
-    devices_path = os.path.join(os.path.dirname(__file__), "resources", "devices.csv")
+    devices_path = os.path.join(os.path.dirname(__file__), "resources", "scattered_devices.csv")
     job_path = os.path.join(os.path.dirname(__file__), "resources", "jobs.csv")
     tasks_path = os.path.join(os.path.dirname(__file__), "resources", "tasks.csv")
 

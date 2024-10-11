@@ -21,7 +21,7 @@ class Environment():
         self.actor_critic = ActorCritic(devices=self.devices)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
         self.monitor = Monitor()
-        self.device_usuages = [deque(maxlen=1000) for i in range(len(self.devices))]
+        self.device_usuages = [deque(maxlen=100) for i in range(len(self.devices))]
 
     def initialize(self):
         print("initialize Envionment")
@@ -49,7 +49,7 @@ class Environment():
             self.monitor.run(job_id)
 
             utilization = None
-            if job_id > 10000:
+            if job_id > 1000:
                 self.change_env()
                 utilization = [sum(usage) for usage in self.device_usuages]
 
@@ -85,10 +85,20 @@ class Environment():
                 #     #TODO device full
                 #     print("+_+_+_+_+_+_+ DEVICE FULL __+_+_+_+_+_+_+_")
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
+                # Normalize utilization to [0, 1]
+                selected_device_util = None
+                if utilization is not None:
+                    utilization = torch.tensor(utilization, dtype=torch.float)
+                    # if job_id > 1000:
+                    #     print(int(torch.sum(utilization)))
+                    #     print(utilization[selected_device_index])
+                    utilization = utilization / torch.sum(utilization)
+                    selected_device_util = utilization[selected_device_index]
                 reward, t, e, batteryFail, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,
                                                                                     core_i=core_index,
                                                                                     freq=freq, volt=vol,
-                                                                                    task_ID=task_id)
+                                                                                    task_ID=task_id,
+                                                                                    utilization=selected_device_util)
                 for i, _ in enumerate(self.device_usuages):
                     if i == selected_device_index:
                         self.device_usuages[i].append(1)
@@ -138,7 +148,7 @@ class Environment():
 
     ##### Functionality
 
-    def execute_action(self, pe_ID, core_i, freq, volt, task_ID):
+    def execute_action(self, pe_ID, core_i, freq, volt, task_ID, utilization):
         pe = self.devices[pe_ID]
         task = self.tasks[task_ID]
         task_pres = [self.tasks[pre_id] for pre_id in task["predecessors"]]
@@ -158,7 +168,7 @@ class Environment():
         if sum(fail_flags) > 0:
             return sum(fail_flags) * reward_function(punish=True), 0, 0, 0, fail_flags[1], fail_flags[0]
 
-        battery_drain_punish = batteryFail = 0
+        battery_drain_punish = 0
         if learning_config["drain_battery"]:
             battery_drain_punish, fail_flags[2] = self.util.checkBatteryDrain(reg_e, pe)
         if fail_flags[2]:
@@ -166,8 +176,12 @@ class Environment():
         if learning_config['regularize_output']:
             reg_t = self.util.regularize_output(total_t=total_t)
             reg_e = self.util.regularize_output(total_e=total_e)
-        return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, fail_flags[2], fail_flags[1], \
-            fail_flags[0]
+        if utilization is not None:
+            return reward_function(t=reg_t, e=reg_e) * (1 - 1 * utilization) + battery_drain_punish, reg_t, reg_e, \
+                fail_flags[2], fail_flags[1], fail_flags[0]
+        else:
+            return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, \
+                fail_flags[2], fail_flags[1], fail_flags[0]
 
     def add_device(self):
         # Add a new random device using the Database method

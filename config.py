@@ -1,5 +1,5 @@
 jobs_config = {
-    "num_jobs": 30000,
+    "num_jobs": 50000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 5,
@@ -18,7 +18,7 @@ jobs_config = {
 
 devices_config = {
     "iot": {
-        "num_devices": 10,
+        "num_devices": 100,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -40,7 +40,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 5,
+        "num_devices": 50,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -76,7 +76,7 @@ devices_config = {
 }
 
 learning_config = {
-    "num_epoch": 20000,
+    "num_epoch": 50000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
@@ -109,7 +109,7 @@ learning_config = {
     "should_explore": False,
     "explore_epsilon": 1e-5,
 
-    "drain_battery": False,
+    "drain_battery": True,
 
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
@@ -119,7 +119,7 @@ learning_config = {
 
     ###### ALGORITHM #######
 
-    "learning_algorithm": "ppo",
+    "learning_algorithm": "policy-grad",
     #   policy-grad
     #   a2c
     #   ppo
@@ -138,7 +138,9 @@ learning_config = {
     "utilization": False,
     "utilization_eps": 1e-4,
 
-    "transmission_calc_type": 0,
+    "transmission_calc_type": 1,
+    # 0: predecessor
+    # 1: tems
 
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',

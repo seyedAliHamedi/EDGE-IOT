@@ -108,6 +108,8 @@ class Utility:
             else:
                 punish = self.getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
                 device['live_state']["battery_now"] = battery_end
+                # if battery_end < 20:
+                #     print(f' b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
 
         return punish, batteryFail
 

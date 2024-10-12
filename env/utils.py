@@ -10,7 +10,7 @@ class Utility:
         self.min_time, self.max_time, self.min_energy, self.max_energy = self.get_min_max_time_energy()
 
     # FEATURE EXTRACTION
-    def get_input(self, task):
+    def get_input(self, task, diversity, gin):
 
         if learning_config['regularize_input']:
             compLoad = [min(jobs_config["task"]["computational_load"]) * 1e6,
@@ -44,6 +44,15 @@ class Utility:
         else:
             task_features.extend([
                 task["task_kind"],
+            ])
+
+        if gin is not None and diversity is not None:
+            task_features.extend([
+                diversity, gin
+            ])
+        else:
+            task_features.extend([
+                0, 1
             ])
         return task_features
 
@@ -112,6 +121,24 @@ class Utility:
                 #     print(f' b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
 
         return punish, batteryFail
+
+    def lambda_D(self, D, lambda_max, T_low, T_high):
+        if D <= T_low:
+            return lambda_max
+        elif D < T_high:
+            return lambda_max * (T_high - D) / (T_high - T_low)
+        else:
+            return 0
+
+    def gini_coefficient(self, utils):
+        utils = np.array(utils)
+        utils = utils[utils != 0]  # Exclude zero counts if necessary
+        sorted_counts = np.sort(utils)
+        N = len(sorted_counts)
+        index = np.arange(1, N + 1)
+        total = utils.sum()
+        G = (2 * (index * sorted_counts).sum() - (N + 1) * total) / (N * total)
+        return G
 
     def regularize_output(self, total_t=0, total_e=0):
         if total_e:
@@ -254,7 +281,7 @@ def calc_total(device, task, task_pres, core, dvfs):
         #     baseEnergy = calc_energy(device, task, core, dvfs)
         #     totalEnergy = baseEnergy
 
-    if len(task_pres) > 0:
+    elif len(task_pres) > 0:
         predecessors_time_cost, predecessors_energy_cost = pred_cost(task_pres, device)
     totalTime += predecessors_time_cost
     totalEnergy += predecessors_energy_cost

@@ -1,5 +1,5 @@
 jobs_config = {
-    "num_jobs": 50000,
+    "num_jobs": 100000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 5,
@@ -76,7 +76,7 @@ devices_config = {
 }
 
 learning_config = {
-    "num_epoch": 50000,
+    "num_epoch": 100000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
@@ -99,6 +99,9 @@ learning_config = {
 
     "alpha": 1,  # energy coefficient in the reward
     "beta": 1,  # time coefficient in the reward
+    "alpha_diversity": 1,
+    "alpha_gin": 1,
+    "max_lambda": 6,
 
     ###### PUNISH #######
     "increasing_punish": False,
@@ -139,8 +142,8 @@ learning_config = {
     "utilization_eps": 1e-4,
 
     "transmission_calc_type": 1,
-    # 0: predecessor
-    # 1: tems
+    #   0: predecessor
+    #   1: tems
 
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',

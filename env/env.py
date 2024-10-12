@@ -49,9 +49,17 @@ class Environment():
             self.monitor.run(job_id)
 
             utilization = None
+            diversity = None
+            gin = None
             if job_id > 1000:
                 self.change_env()
                 utilization = [sum(usage) for usage in self.device_usuages]
+                used_devices_count = sum(1 for usage in self.device_usuages if 1 in usage)
+                diversity = used_devices_count / len(self.devices)
+                gin = self.util.gini_coefficient(utilization)
+
+                # if used_devices_count != 151:
+                #     print(used_devices_count, diversity)
 
             time_job = energy_job = reward_job = loss_job = 0
             fail_job = np.array([0, 0, 0, 0])
@@ -61,8 +69,7 @@ class Environment():
             task_list = self.jobs[job_id]["tasks_ID"]
             for task_id in task_list:
                 current_task = self.tasks[task_id]
-                input_state = self.util.get_input(current_task)
-
+                input_state = self.util.get_input(current_task, diversity, gin)
                 action, path, devices = self.actor_critic.choose_action(input_state, utilization)
 
                 selected_device_index = action
@@ -87,6 +94,7 @@ class Environment():
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
                 # Normalize utilization to [0, 1]
                 selected_device_util = None
+                # diversity = None
                 if utilization is not None:
                     utilization = torch.tensor(utilization, dtype=torch.float)
                     # if job_id > 1000:
@@ -98,7 +106,7 @@ class Environment():
                                                                                     core_i=core_index,
                                                                                     freq=freq, volt=vol,
                                                                                     task_ID=task_id,
-                                                                                    utilization=selected_device_util)
+                                                                                    utilization=selected_device_util, diversity=diversity, gin=gin)
                 for i, _ in enumerate(self.device_usuages):
                     if i == selected_device_index:
                         self.device_usuages[i].append(1)
@@ -148,7 +156,7 @@ class Environment():
 
     ##### Functionality
 
-    def execute_action(self, pe_ID, core_i, freq, volt, task_ID, utilization):
+    def execute_action(self, pe_ID, core_i, freq, volt, task_ID, utilization, diversity, gin):
         pe = self.devices[pe_ID]
         task = self.tasks[task_ID]
         task_pres = [self.tasks[pre_id] for pre_id in task["predecessors"]]
@@ -176,8 +184,12 @@ class Environment():
         if learning_config['regularize_output']:
             reg_t = self.util.regularize_output(total_t=total_t)
             reg_e = self.util.regularize_output(total_e=total_e)
-        if utilization is not None:
-            return reward_function(t=reg_t, e=reg_e) * (1 - 1 * utilization) + battery_drain_punish, reg_t, reg_e, \
+        if utilization is not None and diversity is not None and gin is not None:
+            lambda_diversity = learning_config["max_lambda"] * (1 - diversity)
+            lambda_gini = learning_config["max_lambda"] * gin
+            lambda_penalty = learning_config["alpha_diversity"] * lambda_diversity + learning_config["alpha_gin"] * lambda_gini
+
+            return reward_function(t=reg_t, e=reg_e) * (1 - lambda_penalty * utilization) + battery_drain_punish, reg_t, reg_e, \
                 fail_flags[2], fail_flags[1], fail_flags[0]
         else:
             return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, \

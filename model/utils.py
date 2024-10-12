@@ -20,9 +20,9 @@ def get_tree(devices):
 
 
 def get_num_input():
-    num_input = 8
+    num_input = 10
     if learning_config['onehot_kind']:
-        num_input = 11
+        num_input = 13
     return num_input
 
 

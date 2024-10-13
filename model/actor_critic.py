@@ -21,34 +21,18 @@ class ActorCritic(nn.Module):
         self.critic = get_critic()  # Critic could be None
         self.checkpoint_file = learning_config['checkpoint_file_path']
         self.reset_memory()
-        self.old_log_probs = {i: None for i in range(len(self.devices))}
-        self.utilization_factor = 0.5
+        self.old_log_probs = [ None for i in range(len(self.devices))]
 
     def add_new_device(self, new_device):
         self.actor.add_device(new_device)
-        self.old_log_probs[len(self.devices) - 1] = None
+        self.old_log_probs.append(None)
 
     def remove_new_device(self, device_index):
         # Remove the device from actor
         self.actor.remove_device(device_index)
 
-        # Remove the specific device log prob and shift the rest
-        if device_index in self.old_log_probs:
-            del self.old_log_probs[device_index]
+        self.old_log_probs = self.old_log_probs[:device_index] + self.old_log_probs[device_index+1:]
 
-        # Shift remaining keys to the left
-        updated_log_probs = {}
-        current_index = 0  # Start from 0 for shifted index
-        for key in sorted(self.old_log_probs.keys()):
-            if key > device_index:
-                # Only shift keys greater than the removed device
-                updated_log_probs[current_index] = self.old_log_probs[key]
-                current_index += 1
-            else:
-                updated_log_probs[key] = self.old_log_probs[key]
-
-        # Replace the old log probs with the updated one
-        self.old_log_probs = updated_log_probs
 
     # Store experiences in memory
     def archive(self, state, action, reward):
@@ -74,35 +58,13 @@ class ActorCritic(nn.Module):
         return p, path, devices, v
 
     # Select action based on actor's policy
-    def choose_action(self, observation, utilization=None):
+    def choose_action(self, observation, ):
         state = torch.tensor(observation, dtype=torch.float)
         pi, path, devices, _ = self.forward(state)
 
         self.pis.append(pi)  # Store policy distribution
 
-        if utilization is not None and learning_config['utilization']:
-            utilization = torch.tensor(utilization, dtype=torch.float)  # Ensure utilization is a tensor
-
-            # Normalize utilization to [0, 1]
-            utilization = utilization / torch.max(utilization)  # Scale to max utilization value
-
-            # Dynamic temperature adjustment based on utilization
-            # Higher utilization leads to a higher temperature
-
-            temperature = 1.0 + self.utilization_factor * utilization
-            if 0.5 <= self.utilization_factor <= 1:
-                self.utilization_factor += learning_config['utilization_eps']
-            if self.utilization_factor == 1:
-                learning_config['utilization_eps'] = -1 * learning_config['utilization_eps']
-
-            # Use a more pronounced adjustment
-            pi_adjusted = pi / temperature
-
-            # Normalize adjusted policy distribution
-            probs = F.softmax(pi_adjusted, dim=-1)
-
-        else:
-            probs = F.softmax(pi, dim=-1)
+        probs = F.softmax(pi, dim=-1)
 
         dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
@@ -130,7 +92,13 @@ class ActorCritic(nn.Module):
         # padded_pis = [F.pad(p, (0, max_length - p.size(0)), 'constant', 0) for p in self.pis]
 
         # Stack the padded tensors
-        pis = torch.stack(self.pis, dim=0)
+        max_length = max(p.size(0) for p in self.pis)
+
+        # Pad each pi tensor to the maximum length
+        padded_pis = [F.pad(p, (0, max_length - p.size(0)), 'constant', 0) for p in self.pis]
+
+        # Stack the padded tensors
+        pis = torch.stack(padded_pis, dim=0)
         probs = F.softmax(pis, dim=-1)
         dist = Categorical(probs)
 

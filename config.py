@@ -34,10 +34,8 @@ devices_config = {
         "powerIdle": [800, 900, 1000],
         # battery_capacity in Watt-second
         "battery_capacity": (36, 41),
-        "error_rate": (0.01, 0.06),
         "safe": (0.25, 0.75),
         "num_acceptable_task": [3, 4],
-        "maxQueue": 5
     },
     "mec": {
         "num_devices": 50,
@@ -54,10 +52,8 @@ devices_config = {
         # powerIdle in micro-Watt --> * 1e-6
         "powerIdle": [550000, 650000, 750000],
         "battery_capacity": -1,
-        "error_rate": (0.5, 0.11),
         "safe": (0.5, 0.5),
         "num_acceptable_task": [3, 4],
-        "maxQueue": 1
 
     },
     "cloud": {
@@ -68,10 +64,8 @@ devices_config = {
         "capacitance": (3, 5),
         "powerIdle": [0],
         "battery_capacity": -1,
-        "error_rate": (0.10, 0.15),
         "safe": (1, 0),
-        "num_acceptable_task": [3, 4],  # TODO
-        "maxQueue": 1
+        "num_acceptable_task": [3, 4],  
     },
 }
 
@@ -99,9 +93,6 @@ learning_config = {
 
     "alpha": 1,  # energy coefficient in the reward
     "beta": 1,  # time coefficient in the reward
-    "alpha_diversity": 1,
-    "alpha_gin": 1,
-    "max_lambda": 6,
 
     ###### PUNISH #######
     "increasing_punish": False,
@@ -134,12 +125,14 @@ learning_config = {
 
     "discount_factor": 0.0,  # 0: reward , 0.99:return
 
-    "scalability": False,
-    "add_device_iterations": 0.001,
-    "remove_device_iterations": 0.001,
+    "scalability": True,
+    "add_device_iterations": 0.0005,
+    "remove_device_iterations": 0.0005,
 
-    "utilization": False,
-    "utilization_eps": 1e-4,
+    "utilization": True,
+    "alpha_diversity": 1,
+    "alpha_gin": 1,
+    "max_lambda": 10,
 
     "transmission_calc_type": 1,
     #   0: predecessor

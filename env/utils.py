@@ -22,9 +22,9 @@ class Utility:
                 (task["input_size"] - inputs[0]) / (inputs[1] - inputs[0]),
                 (task["output_size"] - outputs[0]) / (outputs[1] - outputs[0]),
                 task["is_safe"],
-                task["iot_predecessors"],
-                task["mec_predecessors"],
-                task["cloud_predecessors"]
+                task['live_state']["iot_predecessors"],
+                task['live_state']["mec_predecessors"],
+                task['live_state']["cloud_predecessors"]
             ]
         else:
             task_features = [
@@ -32,6 +32,9 @@ class Utility:
                 task["input_size"],
                 task["output_size"],
                 task["is_safe"],
+                task['live_state']["iot_predecessors"],
+                task['live_state']["mec_predecessors"],
+                task['live_state']["cloud_predecessors"]
             ]
 
         if learning_config['onehot_kind']:
@@ -46,13 +49,9 @@ class Utility:
                 task["task_kind"],
             ])
 
-        if gin is not None and diversity is not None:
+        if learning_config['utilization']:
             task_features.extend([
                 diversity, gin
-            ])
-        else:
-            task_features.extend([
-                0, 1
             ])
         return task_features
 
@@ -112,13 +111,12 @@ class Utility:
             battery_start = device['live_state']["battery_now"]
             battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
             if battery_end < device["ISL"] * 100:
+                device['live_state']["battery_now"] = battery_end
                 batteryFail = 1
-                print(device["type"], "battery fail")
+                print("battery fail")
             else:
                 punish = self.getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
                 device['live_state']["battery_now"] = battery_end
-                # if battery_end < 20:
-                #     print(f' b_start: {battery_start}, b_end: {battery_end}, punish: {punish}')
 
         return punish, batteryFail
 
@@ -203,7 +201,7 @@ def pred_cost(task_pres, device):
     costs = []
     device_type = device["type"]
     for pre in task_pres:
-        inf_pairs.append((pre["chosen_device_type"], pre["output_size"]))
+        inf_pairs.append((pre['live_state']["chosen_device_type"], pre["output_size"]))
 
     for pair in inf_pairs:
         if pair[0] == device_type:

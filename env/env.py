@@ -21,7 +21,7 @@ class Environment():
         self.actor_critic = ActorCritic(devices=self.devices)
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
         self.monitor = Monitor()
-        self.device_usuages = [deque(maxlen=100) for i in range(len(self.devices))]
+        self.device_usuages = [deque([1],maxlen=100) for i in range(len(self.devices))]
 
     def initialize(self):
         print("initialize Envionment")
@@ -48,18 +48,17 @@ class Environment():
         for job_id in range(learning_config['num_epoch'] - 1):
             self.monitor.run(job_id)
 
-            utilization = None
+            utilization = [sum(usage) for usage in self.device_usuages]
             diversity = None
-            gin = None
-            if job_id > 1000:
+            gin = self.util.gini_coefficient(utilization)
+            used_devices_count = sum(1 for usage in self.device_usuages if 1 in usage)
+            diversity = used_devices_count / len(self.devices)
+            utilization = torch.tensor(utilization, dtype=torch.float)
+            
+            if job_id > 20000:
                 self.change_env()
-                utilization = [sum(usage) for usage in self.device_usuages]
-                used_devices_count = sum(1 for usage in self.device_usuages if 1 in usage)
-                diversity = used_devices_count / len(self.devices)
-                gin = self.util.gini_coefficient(utilization)
-
-                # if used_devices_count != 151:
-                #     print(used_devices_count, diversity)
+            
+            self.clean_dead_iot()
 
             time_job = energy_job = reward_job = loss_job = 0
             fail_job = np.array([0, 0, 0, 0])
@@ -70,38 +69,23 @@ class Environment():
             for task_id in task_list:
                 current_task = self.tasks[task_id]
                 input_state = self.util.get_input(current_task, diversity, gin)
-                action, path, devices = self.actor_critic.choose_action(input_state, utilization)
+                action, path, devices = self.actor_critic.choose_action(input_state)
 
                 selected_device_index = action
                 if devices:
                     selected_device_index = self.devices.index(devices[selected_device_index])
 
                 selected_device = self.devices[selected_device_index]
-                current_task["chosen_device_type"] = selected_device["type"]
+                current_task['live_state']["chosen_device_type"] = selected_device["type"]
                 current_task_children = [self.tasks[child] for child in current_task["successors"]]
                 for child in current_task_children:
                     child[f"{selected_device['type']}_predecessors"] += 1
 
-                core_index = -1
-                # for i,core in enumerate(selected_device['occupied_cores']):
-                #     if core==-1:
-                #         core_index = i
-                #         Database().set_core_occupied(selected_device["id"], core_index)
-                #         break
-                # if core_index==-1:
-                #     #TODO device full
-                #     print("+_+_+_+_+_+_+ DEVICE FULL __+_+_+_+_+_+_+_")
+                core_index = 0
                 (freq, vol) = selected_device['voltages_frequencies'][core_index][0]
-                # Normalize utilization to [0, 1]
-                selected_device_util = None
-                # diversity = None
-                if utilization is not None:
-                    utilization = torch.tensor(utilization, dtype=torch.float)
-                    # if job_id > 1000:
-                    #     print(int(torch.sum(utilization)))
-                    #     print(utilization[selected_device_index])
-                    utilization = utilization / torch.sum(utilization)
-                    selected_device_util = utilization[selected_device_index]
+                
+                utilization = utilization / torch.sum(utilization)
+                selected_device_util = utilization[selected_device_index]
                 reward, t, e, batteryFail, taskFail, safeFail = self.execute_action(pe_ID=selected_device_index,
                                                                                     core_i=core_index,
                                                                                     freq=freq, volt=vol,
@@ -127,7 +111,7 @@ class Environment():
                 if selected_device['type'] == 'cloud':
                     usage_job[2] += 1
                 path_job.append(path)
-
+            
             loss_job = self.actor_critic.calc_loss()
             self.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(task_list),
                                 path_job, [sum(usage) for usage in self.device_usuages])
@@ -136,21 +120,17 @@ class Environment():
             loss_job.backward()
             self.optimizer.step()
 
-            if job_id % 10 == 0:
-                self.actor_critic.update_regressor()
+            self.actor_critic.update_regressor()
 
-            # if job_id % 1000 ==0:
-            #     self.save_models()
-            #     self.load_models()
 
             self.actor_critic.reset_memory()
 
     def change_env(self):
         if learning_config['scalability']:
-            if np.random.random() < learning_config['add_device_iterations']:
+            if float("{:.5f}".format(np.random.random())) < learning_config['add_device_iterations']:
                 print("device Add")
                 self.add_device()
-            if np.random.random() < learning_config['remove_device_iterations']:
+            if float("{:.5f}".format(np.random.random())) < learning_config['remove_device_iterations']:
                 print("device Removed")
                 self.remove_device()
 
@@ -179,38 +159,43 @@ class Environment():
         battery_drain_punish = 0
         if learning_config["drain_battery"]:
             battery_drain_punish, fail_flags[2] = self.util.checkBatteryDrain(reg_e, pe)
-        if fail_flags[2]:
-            return reward_function(punish=True), 0, 0, 1, 0, 0
-        if learning_config['regularize_output']:
-            reg_t = self.util.regularize_output(total_t=total_t)
-            reg_e = self.util.regularize_output(total_e=total_e)
-        if utilization is not None and diversity is not None and gin is not None:
+            
+            if fail_flags[2]:
+                return reward_function(punish=True), 0, 0, 1, 0, 0
+        
+        lambda_penalty = 0
+        if learning_config['utilization']            :
             lambda_diversity = learning_config["max_lambda"] * (1 - diversity)
             lambda_gini = learning_config["max_lambda"] * gin
             lambda_penalty = learning_config["alpha_diversity"] * lambda_diversity + learning_config["alpha_gin"] * lambda_gini
 
-            return reward_function(t=reg_t, e=reg_e) * (1 - lambda_penalty * utilization) + battery_drain_punish, reg_t, reg_e, \
-                fail_flags[2], fail_flags[1], fail_flags[0]
-        else:
-            return reward_function(t=reg_t, e=reg_e) + battery_drain_punish, reg_t, reg_e, \
-                fail_flags[2], fail_flags[1], fail_flags[0]
-
+        if learning_config['regularize_output']:
+            reg_t = self.util.regularize_output(total_t=total_t)
+            reg_e = self.util.regularize_output(total_e=total_e)
+        return reward_function(t=reg_t, e=reg_e) * (1 - lambda_penalty * utilization) + battery_drain_punish, reg_t, reg_e, fail_flags[2], fail_flags[1], fail_flags[0]
+    
     def add_device(self):
         # Add a new random device using the Database method
         device = Generator.generate_random_device()
         self.devices.append(device)
+        self.device_usuages.append(deque([1],maxlen=100))
         # Refresh the devices list after adding a device
         self.actor_critic.add_new_device(device)
 
-    def remove_device(self):
+    def remove_device(self,device_index=None):
         # Randomly remove a device
         if len(self.devices) > 1:
-            device_index = np.random.randint(0, len(self.devices) - 1)
-            if self.devices[device_index]['type'] == 'cloud':
-                return self.remove_device()
+            if device_index is None:
+                device_index = np.random.randint(0, len(self.devices) - 1)
+                if self.devices[device_index]['type'] == 'cloud':
+                    return self.remove_device()
+            else:
+                print("iot battery dead removed")
             # Remove the selected device from the Database
-
             del self.devices[device_index]
-
             # Refresh the devices list after removing the device
             self.actor_critic.remove_new_device(device_index)
+    def clean_dead_iot(self):
+        for device_index,device in enumerate(self.devices):
+            if device['type']=='iot' and device['live_state']['battery_now'] < device['ISL']*100:
+                self.remove_device(device_index=device_index)

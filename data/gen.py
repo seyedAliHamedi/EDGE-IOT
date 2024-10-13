@@ -19,7 +19,6 @@ class Generator:
         for device in devices:
             device['live_state'] = {}
             device['live_state']['battery_now'] = -1 if device["battery_capacity"] == -1 else 100.0
-            device['live_state']['occupied_cores'] = [-1 for _ in range(device['num_cores'])]
         return devices
 
     @classmethod
@@ -28,7 +27,14 @@ class Generator:
 
     @classmethod
     def get_tasks(cls):
-        return cls._load_csv(cls.tasks_path, cls.generate_jobs)
+        tasks = cls._load_csv(cls.tasks_path, cls.generate_jobs)
+        for task in tasks:
+            task['live_state'] = {}
+            task['live_state']["chosen_device_type"]= None
+            task['live_state']["iot_predecessors"]= 0
+            task['live_state']["mec_predecessors"]= 0
+            task['live_state']["cloud_predecessors"]= 0
+        return tasks 
 
     @classmethod
     def generate_jobs(cls):
@@ -98,7 +104,6 @@ class Generator:
             "capacitance": np.random.uniform(*config["capacitance"]) * 1e-9,
             "powerIdle": float(np.random.choice(config["powerIdle"])) * 1e-6,
             "battery_capacity": cls._generate_value(config["battery_capacity"]) * 1e6,
-            "error_rate": np.random.uniform(*config["error_rate"]),
             "acceptable_tasks": list(np.random.choice(jobs_config["task"]["task_kinds"],
                                                       size=np.random.randint(config["num_acceptable_task"][0],
                                                                              config["num_acceptable_task"][1]),
@@ -123,10 +128,6 @@ class Generator:
             "task_kind": np.random.choice(task_config["task_kinds"]),
             "is_safe": np.random.choice([0, 1],
                                         p=[task_config["safe_measurement"][0], task_config["safe_measurement"][1]]),
-            "chosen_device_type": "None",
-            "iot_predecessors": 0,
-            "mec_predecessors": 0,
-            "cloud_predecessors": 0
         }
 
     @staticmethod
@@ -178,7 +179,6 @@ class Generator:
             "capacitance": np.random.uniform(*device_config["capacitance"]) * 1e-9,
             "powerIdle": float(np.random.choice(device_config["powerIdle"])) * 1e-6,
             "battery_capacity": cls._generate_value(device_config["battery_capacity"]) * 1e6,
-            "error_rate": np.random.uniform(*device_config["error_rate"]),
             "acceptable_tasks": list(np.random.choice(jobs_config["task"]["task_kinds"],
                                                       size=np.random.randint(3, 4),
                                                       replace=False)),
@@ -186,5 +186,4 @@ class Generator:
         }
         device['live_state'] = {}
         device['live_state']['battery_now'] = -1 if device["battery_capacity"] == -1 else 100.0
-        device['live_state']['occupied_cores'] = [-1 for _ in range(device['num_cores'])]
         return device

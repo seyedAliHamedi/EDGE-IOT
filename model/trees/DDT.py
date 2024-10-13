@@ -40,11 +40,9 @@ class DDT(nn.Module):
         if depth == max_depth:
             self.prob_dist = nn.Parameter(torch.ones(num_output))
             self.logit_regressor = nn.Sequential(
-                nn.Linear(learning_config['pe_num_features'], 128),
+                nn.Linear(learning_config['pe_num_features'], 256),
                 nn.Sigmoid(),
-                nn.Linear(128, 128),
-                nn.Sigmoid(),
-                nn.Linear(128, 1),
+                nn.Linear(256, 1),
             )
             self.logit_optimizer = optim.Adam(self.logit_regressor.parameters(), lr=0.01)
         if depth < max_depth:

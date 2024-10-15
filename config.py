@@ -113,7 +113,7 @@ learning_config = {
 
     ###### ALGORITHM #######
 
-    "learning_algorithm": "policy-grad",
+    "learning_algorithm": "ppo",
     #   policy-grad
     #   a2c
     #   ppo
@@ -129,7 +129,7 @@ learning_config = {
     "add_device_iterations": 0.0005,
     "remove_device_iterations": 0.0005,
 
-    "utilization": True,
+    "utilization": False,
     "alpha_diversity": 1,
     "alpha_gin": 1,
     "max_lambda": 10,
@@ -137,6 +137,8 @@ learning_config = {
     "transmission_calc_type": 1,
     #   0: predecessor
     #   1: tems
+    
+    "multi_agent":5,
 
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',

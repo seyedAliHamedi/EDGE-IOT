@@ -191,7 +191,7 @@ class Monitor():
         avg_loss = loss_epoch / num_episodes
         avg_fail = [elem / num_episodes for elem in fail_epoch]
 
-        avg_loss = avg_loss.detach().numpy()
+        avg_loss = avg_loss
         self.avg_loss_history = np.append(self.avg_loss_history, avg_loss)
         self.avg_reward_history = np.append(self.avg_reward_history, avg_reward)
         self.avg_time_history = np.append(self.avg_time_history, avg_time)

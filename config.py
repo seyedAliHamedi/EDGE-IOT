@@ -113,7 +113,7 @@ learning_config = {
 
     ###### ALGORITHM #######
 
-    "learning_algorithm": "policy-grad",
+    "learning_algorithm": "ppo",
     #   policy-grad
     #   a2c
     #   ppo
@@ -126,8 +126,8 @@ learning_config = {
     "discount_factor": 0.0,  # 0: reward , 0.99:return
 
     "scalability": True,
-    "add_device_iterations": 0.0005,
-    "remove_device_iterations": 0.0005,
+    "add_device_iterations": 0.0001,
+    "remove_device_iterations": 0.0001,
 
     "utilization": True,
     "alpha_diversity": 1,

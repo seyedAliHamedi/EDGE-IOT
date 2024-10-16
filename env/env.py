@@ -1,6 +1,7 @@
 from collections import deque
 import os
 import time
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -22,6 +23,7 @@ class Environment():
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=0.005)
         self.monitor = Monitor()
         self.device_usuages = [deque([1],maxlen=100) for i in range(len(self.devices))]
+        self.stablized =False
 
     def initialize(self):
         print("initialize Envionment")
@@ -47,6 +49,9 @@ class Environment():
         print("Starting...")
         for job_id in range(learning_config['num_epoch'] - 1):
             self.monitor.run(job_id)
+            
+            if self.stablized:
+                self.change_env()
 
             utilization = [sum(usage) for usage in self.device_usuages]
             diversity = None
@@ -55,8 +60,11 @@ class Environment():
             diversity = used_devices_count / len(self.devices)
             utilization = torch.tensor(utilization, dtype=torch.float)
             
-            if job_id > 20000:
-                self.change_env()
+            
+                
+            if job_id > 20000 and all(x <= 0.15 for x in self.monitor.avg_fail_history[:,0][-1000:]) and not self.stablized:
+                print("STABLIZED")
+                self.stablized =True
             
             self.clean_dead_iot()
 
@@ -186,13 +194,14 @@ class Environment():
         # Randomly remove a device
         if len(self.devices) > 1:
             if device_index is None:
-                device_index = np.random.randint(0, len(self.devices) - 1)
+                device_index = random.choices(range(len(self.devices)), weights=[1/(x+1) for x in [sum(usage) for usage in self.device_usuages]], k=1)[0]
                 if self.devices[device_index]['type'] == 'cloud':
                     return self.remove_device()
             else:
                 print("iot battery dead removed")
             # Remove the selected device from the Database
             del self.devices[device_index]
+            del self.device_usuages[device_index]
             # Refresh the devices list after removing the device
             self.actor_critic.remove_new_device(device_index)
     def clean_dead_iot(self):

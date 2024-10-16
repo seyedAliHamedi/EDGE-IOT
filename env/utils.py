@@ -10,50 +10,6 @@ class Utility:
         self.min_time, self.max_time, self.min_energy, self.max_energy = self.get_min_max_time_energy()
 
     # FEATURE EXTRACTION
-    def get_input(self, task, diversity, gin):
-
-        if learning_config['regularize_input']:
-            compLoad = [min(jobs_config["task"]["computational_load"]) * 1e6,
-                        max(jobs_config["task"]["computational_load"]) * 1e6]
-            inputs = [min(jobs_config["task"]["input_size"]) * 1e6, max(jobs_config["task"]["input_size"]) * 1e6]
-            outputs = [min(jobs_config["task"]["output_size"]) * 1e6, max(jobs_config["task"]["output_size"]) * 1e6]
-            task_features = [
-                (task["computational_load"] - compLoad[0]) / (compLoad[1] - compLoad[0]),
-                (task["input_size"] - inputs[0]) / (inputs[1] - inputs[0]),
-                (task["output_size"] - outputs[0]) / (outputs[1] - outputs[0]),
-                task["is_safe"],
-                task['live_state']["iot_predecessors"],
-                task['live_state']["mec_predecessors"],
-                task['live_state']["cloud_predecessors"]
-            ]
-        else:
-            task_features = [
-                task["computational_load"],
-                task["input_size"],
-                task["output_size"],
-                task["is_safe"],
-                task['live_state']["iot_predecessors"],
-                task['live_state']["mec_predecessors"],
-                task['live_state']["cloud_predecessors"]
-            ]
-
-        if learning_config['onehot_kind']:
-            task_features.extend([
-                1 if task["task_kind"] == 1 else 0,
-                1 if task["task_kind"] == 2 else 0,
-                1 if task["task_kind"] == 3 else 0,
-                1 if task["task_kind"] == 4 else 0,
-            ])
-        else:
-            task_features.extend([
-                task["task_kind"],
-            ])
-
-        if learning_config['utilization']:
-            task_features.extend([
-                diversity, gin
-            ])
-        return task_features
 
     def get_min_max_time_energy(self):
         min_time = float('inf')
@@ -87,57 +43,6 @@ class Utility:
                                 max_energy = max(max_energy, total_energy)
         return min_time, max_time, min_energy, max_energy
 
-    def getBatteryPunish(self, b_start, b_end, alpha=-100.0, beta=3.0, gamma=0.1):
-        if b_start < b_end:
-            raise ValueError("Final battery level must be less than or equal to the initial battery level.")
-
-        # Calculate the percentage of battery drained and apply non-linearity
-        battery_drain = (b_start - b_end) ** gamma
-
-        # Calculate the exponential penalty factor based on the remaining battery level
-        low_battery_factor = ((100 - b_end) / 100) ** beta
-
-        # Calculate the total penalty
-        penalty = alpha * battery_drain * low_battery_factor
-
-        return penalty
-
-    def checkBatteryDrain(self, energy, device):
-        punish = 0
-        batteryFail = 0
-
-        if device['type'] == "iot":
-            battery_capacity = device["battery_capacity"]
-            battery_start = device['live_state']["battery_now"]
-            battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
-            if battery_end < device["ISL"] * 100:
-                device['live_state']["battery_now"] = battery_end
-                batteryFail = 1
-                print("battery fail")
-            else:
-                punish = self.getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
-                device['live_state']["battery_now"] = battery_end
-
-        return punish, batteryFail
-
-    def lambda_D(self, D, lambda_max, T_low, T_high):
-        if D <= T_low:
-            return lambda_max
-        elif D < T_high:
-            return lambda_max * (T_high - D) / (T_high - T_low)
-        else:
-            return 0
-
-    def gini_coefficient(self, utils):
-        utils = np.array(utils)
-        utils = utils[utils != 0]  # Exclude zero counts if necessary
-        sorted_counts = np.sort(utils)
-        N = len(sorted_counts)
-        index = np.arange(1, N + 1)
-        total = utils.sum()
-        G = (2 * (index * sorted_counts).sum() - (N + 1) * total) / (N * total)
-        return G
-
     def regularize_output(self, total_t=0, total_e=0):
         if total_e:
             return (total_e - self.min_energy) / (self.max_energy - self.min_energy)
@@ -151,25 +56,115 @@ class Utility:
         return pe_features
 
 
-def extract_pe_data(pe):
-    # TODO : regularize
-    # devicePower = 0
-    # for index, core in enumerate(pe["voltages_frequencies"]):
-    #     corePower = 0
-    #     for mod in core:
-    #         freq, vol = mod
-    #         corePower += (freq / vol)
-    #     devicePower += corePower
 
+
+def lambda_D( D, lambda_max, T_low, T_high):
+    if D <= T_low:
+        return lambda_max
+    elif D < T_high:
+        return lambda_max * (T_high - D) / (T_high - T_low)
+    else:
+        return 0
+
+def gini_coefficient( utils):
+    utils = np.array(utils)
+    utils = utils[utils != 0]  # Exclude zero counts if necessary
+    sorted_counts = np.sort(utils)
+    N = len(sorted_counts)
+    index = np.arange(1, N + 1)
+    total = utils.sum()
+    G = (2 * (index * sorted_counts).sum() - (N + 1) * total) / (N * total)
+    return G
+
+
+def getBatteryPunish(b_start, b_end, alpha=-100.0, beta=3.0, gamma=0.1):
+    if b_start < b_end:
+        raise ValueError("Final battery level must be less than or equal to the initial battery level.")
+
+    # Calculate the percentage of battery drained and apply non-linearity
+    battery_drain = (b_start - b_end) ** gamma
+
+    # Calculate the exponential penalty factor based on the remaining battery level
+    low_battery_factor = ((100 - b_end) / 100) ** beta
+
+    # Calculate the total penalty
+    penalty = alpha * battery_drain * low_battery_factor
+
+    return penalty
+
+def checkBatteryDrain( energy, device):
+    punish = 0
+    batteryFail = 0
+
+    if device['type'] == "iot":
+        battery_capacity = device["battery_capacity"]
+        battery_start = device['live_state']["battery_now"]
+        battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
+        if battery_end < device["ISL"] * 100:
+            device['live_state']["battery_now"] = battery_end
+            batteryFail = 1
+            print("battery fail")
+        else:
+            punish = getBatteryPunish(battery_start, battery_end, alpha=learning_config["init_punish"])
+            device['live_state']["battery_now"] = battery_end
+
+    return punish, batteryFail
+
+# DATA EXTRACTION 
+def get_input(task, diversity, gin):
+
+    if learning_config['regularize_input']:
+        compLoad = [min(jobs_config["task"]["computational_load"]) * 1e6,
+                    max(jobs_config["task"]["computational_load"]) * 1e6]
+        inputs = [min(jobs_config["task"]["input_size"]) * 1e6, max(jobs_config["task"]["input_size"]) * 1e6]
+        outputs = [min(jobs_config["task"]["output_size"]) * 1e6, max(jobs_config["task"]["output_size"]) * 1e6]
+        task_features = [
+            (task["computational_load"] - compLoad[0]) / (compLoad[1] - compLoad[0]),
+            (task["input_size"] - inputs[0]) / (inputs[1] - inputs[0]),
+            (task["output_size"] - outputs[0]) / (outputs[1] - outputs[0]),
+            task["is_safe"],
+            task['live_state']["iot_predecessors"],
+            task['live_state']["mec_predecessors"],
+            task['live_state']["cloud_predecessors"]
+        ]
+    else:
+        task_features = [
+            task["computational_load"],
+            task["input_size"],
+            task["output_size"],
+            task["is_safe"],
+            task['live_state']["iot_predecessors"],
+            task['live_state']["mec_predecessors"],
+            task['live_state']["cloud_predecessors"]
+        ]
+
+    if learning_config['onehot_kind']:
+        task_features.extend([
+            1 if task["task_kind"] == 1 else 0,
+            1 if task["task_kind"] == 2 else 0,
+            1 if task["task_kind"] == 3 else 0,
+            1 if task["task_kind"] == 4 else 0,
+        ])
+    else:
+        task_features.extend([
+            task["task_kind"],
+        ])
+
+    if learning_config['utilization']:
+        task_features.extend([
+            diversity, gin
+        ])
+    return task_features
+
+
+def extract_pe_data(pe):
     battery_now = pe['live_state']['battery_now']
     acceptable_tasks = [0, 0, 0, 0]
     for i in range(1, 5):
         if i in pe['acceptable_tasks']:
             acceptable_tasks[i - 1] = 1
 
-    # return [battery_now /100, pe['is_safe']] + acceptable_tasks
-    return [battery_now / 100, pe['is_safe']]
-
+    return [battery_now /100, pe['is_safe']] + acceptable_tasks
 
 # FORMULAS
 def calc_execution_time(device, task, core, dvfs):
@@ -286,7 +281,6 @@ def calc_total(device, task, task_pres, core, dvfs):
 
     return totalTime, totalEnergy
 
-
 # REWARDS AND PUNISHMENTS
 def reward_function(e=0, t=0, punish=0):
     setup = learning_config['rewardSetup']
@@ -294,10 +288,10 @@ def reward_function(e=0, t=0, punish=0):
     beta = learning_config['beta']
 
     if punish and learning_config['increasing_punish']:
-        learning_config['init_punish'] += learning_config['punish_epsilon']
+        learning_config['current_punish'] += learning_config['punish_epsilon']
 
     if punish:
-        return learning_config['init_punish']
+        return learning_config['current_punish']
 
     if setup == 1:
         return -1 * (alpha * e + beta * t)

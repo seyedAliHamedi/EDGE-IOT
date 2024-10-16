@@ -1,9 +1,11 @@
 import os
+import time
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 
+from env.utils import *
 from model.actor_critic import ActorCritic
 
 
@@ -35,40 +37,39 @@ class Agent(mp.Process):
                     self.assigned_job = self.env.assign_job_to_agent()
                 if self.assigned_job is None:
                     continue
-                print(self.name,self.assigned_job)
-                print(":LL:L:L:L:L::LL:L:L:L::LL:L:L::L:LL:L:L:")
             # retrive the agent task_queue
             task_queue = self.env.get_agent_queue(self.assigned_job)
             if task_queue is None:
                 continue
             
             
-            time_job = energy_job = reward_job = loss_job = 0
-            fail_job = np.array([0, 0, 0, 0])
-            usage_job = np.array([0, 0, 0])
-            path_job = []
+            self.time_job = 0
+            self.energy_job =0
+            self.reward_job = 0
+            self.loss_job = 0
+            self.fail_job = np.array([0, 0, 0, 0])
+            self.usage_job = np.array([0, 0, 0])
+            self.path_job = []
             
             utilization = [sum(usage) for usage in self.env.device_usuages]
-            gin = self.env.util.gini_coefficient(utilization)
+            gin = gini_coefficient(utilization)
             used_devices_count = sum(1 for usage in self.env.device_usuages if 1 in usage)
             diversity = used_devices_count / len(self.env.devices)
             utilization = torch.tensor(utilization, dtype=torch.float)
-            
             for task in task_queue:
-                self.schedule(task,time_job,energy_job,reward_job,fail_job ,usage_job ,path_job,gin,diversity,utilization)
+                self.schedule(task,gin,diversity,utilization)
                 
-            self.update()
-            self.env.monitor.update(time_job, energy_job, reward_job, loss_job, fail_job, usage_job, len(task_queue),
-                            path_job, [sum(usage) for usage in self.env.device_usuages])
+            loss_job = self.update()
+            self.env.update_monitor(self.time_job, self.energy_job, self.reward_job, loss_job, self.fail_job, self.usage_job, len(task_queue),self.path_job, [sum(usage) for usage in self.env.device_usuages])
             self.assigned_job = None
+            
 
     def stop(self):
         self.runner_flag = False
 
-    def schedule(self, current_task_id,time_job,energy_job,reward_job,fail_job ,usage_job ,path_job,gin,diversity,utilization):
-        print(self.name,current_task_id)
+    def schedule(self, current_task_id,gin,diversity,utilization):
         current_task = self.env.tasks[current_task_id]
-        input_state = self.env.util.get_input(current_task, diversity, gin)
+        input_state = get_input(current_task, diversity, gin)
         action, path, devices = self.local_actor_critic.choose_action(input_state)
         selected_device_index = action
         if devices:
@@ -88,26 +89,21 @@ class Agent(mp.Process):
                                                                                 freq=freq, volt=vol,
                                                                                 task_ID=current_task_id,
                                                                                 utilization=selected_device_util, diversity=diversity, gin=gin)
-        for i, _ in enumerate(self.env.device_usuages):
-            if i == selected_device_index:
-                self.env.device_usuages[i].append(1)
-            else:
-                self.env.device_usuages[i].append(0)
-
+      
         self.local_actor_critic.archive(input_state, action, reward)
 
-        reward_job += reward
-        time_job += t
-        energy_job += e
+        self.reward_job += reward
+        self.time_job += t
+        self.energy_job += e
         fails = np.array([taskFail + safeFail + batteryFail, batteryFail, taskFail, safeFail])
-        fail_job += fails
+        self.fail_job += fails
         if selected_device['type'] == 'iot':
-            usage_job[0] += 1
+            self.usage_job[0] += 1
         if selected_device['type'] == 'mec':
-            usage_job[1] += 1
+            self.usage_job[1] += 1
         if selected_device['type'] == 'cloud':
-            usage_job[2] += 1
-        path_job.append(path)
+            self.usage_job[2] += 1
+        self.path_job.append(path)
         
 
 
@@ -125,6 +121,7 @@ class Agent(mp.Process):
         self.global_optimizer.step()  # update global model
         self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())  # update local model
         self.local_actor_critic.reset_memory()
+        return loss.item()
 
 
 

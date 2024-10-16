@@ -71,6 +71,9 @@ devices_config = {
 
 learning_config = {
     "num_epoch": 100000,
+    "multi_agent":2,
+
+    "num_iteration":5000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
@@ -97,6 +100,7 @@ learning_config = {
     ###### PUNISH #######
     "increasing_punish": False,
     "init_punish": -10,
+    "current_punish": -10,
     "punish_epsilon": -0.001,
 
     ###### EXPLORE #######
@@ -109,7 +113,7 @@ learning_config = {
     "onehot_kind": True,  # one-hotting the task kind
     "regularize_input": True,  # regularize the task/device features to feed the tree
     "regularize_output": False,  # regularize t,e for the reward
-    'pe_num_features': 2,
+    'pe_num_features': 6,
 
     ###### ALGORITHM #######
 
@@ -138,7 +142,6 @@ learning_config = {
     #   0: predecessor
     #   1: tems
     
-    "multi_agent":5,
 
     ###### PATHS #######
     "result_summery_path": './results/summery.csv',

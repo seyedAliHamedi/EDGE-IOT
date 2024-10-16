@@ -4,84 +4,92 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from multiprocessing import Manager
 
-from config import learning_config,devices_config
+from config import learning_config, devices_config
 
 
-class Monitor():
-    def __init__(self):
+class Monitor:
+    def __init__(self, manager):
+        # Using manager.dict() and manager.list() for shared data structures
         self.config = learning_config
-        self.avg_time_history = np.array([])
-        self.avg_energy_history = np.array([])
-        self.avg_fail_history = np.array([0, 0,0, 0])
-        self.avg_loss_history = np.array([])
-        self.avg_reward_history = np.array([])
+        self.avg_time_history = manager.list()
+        self.avg_energy_history = manager.list()
+        self.avg_fail_history = manager.list()
+        self.avg_loss_history = manager.list()
+        self.avg_reward_history = manager.list()
 
-        self.iot_usage = []
-        self.mec_usage = []
-        self.cc_usage = []
-        self.device_usage=[]
-        self.path_history = []
+        self.iot_usage = manager.list()
+        self.mec_usage = manager.list()
+        self.cc_usage = manager.list()
+        self.device_usage = manager.list()
+        self.path_history = manager.list()
         self.starting_time = time.time()
-        
-    def run(self,job_id):
-        
-        if job_id>0 and ((job_id / learning_config['num_epoch']) * 100) % 10 == 0:
-                print(f"{((job_id / learning_config['num_epoch']) * 100)}% done in {int(time.time() - self.starting_time)} seconds")
-                self.plot_histories()
-        
-        if job_id==learning_config['num_epoch']-2:
-            self.save_results()
+
+    def run(self, iteration):
+        if iteration > 0 and (iteration) % 10 == 0:
+            print(f"{((iteration / learning_config['num_iteration']) * 100)}% done in {int(time.time() - self.starting_time)} seconds")
             self.plot_histories()
+            self.save_results()
+
+        if iteration > 0 and ((iteration / learning_config['num_iteration']) * 100) % 10 == 0:
+            print(f"{((iteration / learning_config['num_iteration']) * 100)}% done in {int(time.time() - self.starting_time)} seconds")
+            self.plot_histories()
+
+        if iteration == learning_config['num_iteration'] - 1:
             print("----------- COMPLETED------------")
-        
+
     def save_results(self):
         num_epoch = learning_config['num_epoch']
         half_num_epoch = num_epoch // 2
 
+        avg_time_history = np.array(self.avg_time_history)
+        avg_energy_history = np.array(self.avg_energy_history)
+        avg_fail_history = np.array(self.avg_fail_history)
+        avg_loss_history = np.array(self.avg_loss_history)
+        avg_reward_history = np.array(self.avg_reward_history)
         new_epoch_data = {
             "Setup": learning_config['rewardSetup'],
             "Punishment": learning_config['init_punish'],
 
             "Average Loss": sum(self.avg_loss_history) / num_epoch,
-            "Last Epoch Loss": self.avg_loss_history[-1],
-            
-            "Battery Converge": int(np.argmax(np.flip(self.avg_fail_history[:,1]) != 0)),
-            "Battery Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 1]) / len(self.avg_fail_history[:, 1]),
-            "Task Converge": int(np.argmax(np.flip(self.avg_fail_history[:, 1]) != 0)),
-            "Task Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 2]) / len(self.avg_fail_history[:, 2]),
-            "Safe Converge": int(np.argmax(np.flip(self.avg_fail_history[:, 3]) != 0)),
-            "Safe Fail Percentage": np.count_nonzero(self.avg_fail_history[:, 3]) / len(self.avg_fail_history[:, 3]),
+            "Last Epoch Loss": self.avg_loss_history[-1] if self.avg_loss_history else None,
 
-            "Average Time": sum(self.avg_time_history) / num_epoch,
-            "Last Epoch Time": self.avg_time_history[-1],
+            "Battery Converge": int(np.argmax(np.flip(avg_fail_history[:, 1]) != 0)),
+            "Battery Fail Percentage": np.count_nonzero(avg_fail_history[:, 1]) / len(avg_fail_history[:, 1]),
+            "Task Converge": int(np.argmax(np.flip(avg_fail_history[:, 1]) != 0)),
+            "Task Fail Percentage": np.count_nonzero(avg_fail_history[:, 2]) / len(avg_fail_history[:, 2]),
+            "Safe Converge": int(np.argmax(np.flip(avg_fail_history[:, 3]) != 0)),
+            "Safe Fail Percentage": np.count_nonzero(avg_fail_history[:, 3]) / len(avg_fail_history[:, 3]),
 
-            "Average Energy": sum(self.avg_energy_history) / num_epoch,
-            "Last Epoch Energy": self.avg_energy_history[-1],
+            "Average Time": sum(avg_time_history) / num_epoch,
+            "Last Epoch Time": avg_time_history[-1] ,
 
-            "Average Reward": sum(self.avg_reward_history) / num_epoch,
-            "Last Epoch Reward": self.avg_reward_history[-1],
+            "Average Energy": sum(avg_energy_history) / num_epoch,
+            "Last Epoch Energy": avg_energy_history[-1] ,
 
-            "First 10 Avg Time": np.mean(self.avg_time_history[:10]),
-            "Mid 10 Avg Time": np.mean(self.avg_time_history[half_num_epoch:half_num_epoch + 10]),
-            "Last 10 Avg Time": np.mean(self.avg_time_history[:-10]),
+            "Average Reward": sum(avg_reward_history) / num_epoch,
+            "Last Epoch Reward": avg_reward_history[-1] ,
 
-            "First 10 Avg Energy": np.mean(self.avg_energy_history[:10]),
-            "Mid 10 Avg Energy": np.mean(self.avg_energy_history[half_num_epoch:half_num_epoch + 10]),
-            "Last 10 Avg Energy": np.mean(self.avg_energy_history[:-10]),
+            "First 10 Avg Time": np.mean(avg_time_history[:10]) if len(avg_time_history) >= 10 else None,
+            "Mid 10 Avg Time": np.mean(avg_time_history[half_num_epoch:half_num_epoch + 10]) if len(avg_time_history) >= half_num_epoch + 10 else None,
+            "Last 10 Avg Time": np.mean(avg_time_history[:-10]) if len(avg_time_history) >= 10 else None,
 
-            "First 10 Avg Reward": np.mean(self.avg_reward_history[:10]),
-            "Mid 10 Avg Reward": np.mean(self.avg_reward_history[half_num_epoch:half_num_epoch + 10]),
-            "Last 10 Avg Reward": np.mean(self.avg_reward_history[:-10]),
+            "First 10 Avg Energy": np.mean(avg_energy_history[:10]) if len(avg_energy_history) >= 10 else None,
+            "Mid 10 Avg Energy": np.mean(avg_energy_history[half_num_epoch:half_num_epoch + 10]) if len(avg_energy_history) >= half_num_epoch + 10 else None,
+            "Last 10 Avg Energy": np.mean(avg_energy_history[:-10]) if len(avg_energy_history) >= 10 else None,
 
-            "First 10 Avg Loss": np.mean(self.avg_loss_history[:10]),
-            "Mid 10 Avg Loss": np.mean(self.avg_loss_history[half_num_epoch:half_num_epoch + 10]),
-            "Last 10 Avg Loss": np.mean(self.avg_loss_history[:-10]),
+            "First 10 Avg Reward": np.mean(avg_reward_history[:10]) if len(avg_reward_history) >= 10 else None,
+            "Mid 10 Avg Reward": np.mean(avg_reward_history[half_num_epoch:half_num_epoch + 10]) if len(avg_reward_history) >= half_num_epoch + 10 else None,
+            "Last 10 Avg Reward": np.mean(avg_reward_history[:-10]) if len(avg_reward_history) >= 10 else None,
 
-            "First 10 (total, task, safe) Fail": str(np.mean(self.avg_fail_history[:10], axis=0)),
-            "Mid 10 (total, task, safe) Fail": str(
-                np.mean(self.avg_fail_history[half_num_epoch:half_num_epoch + 10], axis=0)),
-            "Last 10 (total, task, safe) Fail": str(np.mean(self.avg_fail_history[:-10], axis=0)),
+            "First 10 Avg Loss": np.mean(avg_loss_history[:10]) if len(avg_loss_history) >= 10 else None,
+            "Mid 10 Avg Loss": np.mean(avg_loss_history[half_num_epoch:half_num_epoch + 10]) if len(avg_loss_history) >= half_num_epoch + 10 else None,
+            "Last 10 Avg Loss": np.mean(avg_loss_history[:-10]) if len(avg_loss_history) >= 10 else None,
+
+            "First 10 (total, task, safe) Fail": str(np.mean(avg_fail_history[:10], axis=0)) if len(avg_fail_history) >= 10 else None,
+            "Mid 10 (total, task, safe) Fail": str(np.mean(avg_fail_history[half_num_epoch:half_num_epoch + 10], axis=0)) if len(avg_fail_history) >= half_num_epoch + 10 else None,
+            "Last 10 (total, task, safe) Fail": str(np.mean(avg_fail_history[:-10], axis=0)) if len(avg_fail_history) >= 10 else None,
         }
         new_epoch_data_list = [new_epoch_data]
 
@@ -89,11 +97,15 @@ class Monitor():
         if os.path.exists(learning_config['result_summery_path']):
             df = pd.read_csv(learning_config['result_summery_path'])
             new_df = pd.DataFrame(new_epoch_data_list)
+            df = df.dropna(how='all', axis=1)
+            new_df = new_df.dropna(how='all', axis=1)
+
             df = pd.concat([df, new_df], ignore_index=True)
         else:
             df = pd.DataFrame(new_epoch_data_list)
 
         df.to_csv(learning_config['result_summery_path'], index=False)
+
 
     def plot_histories(self, punish=0, epsilon=0, init_explore_rate=0, explore_rate=0, exp_counter=0):
         fig = plt.figure(figsize=(20, 15))
@@ -133,7 +145,7 @@ class Monitor():
         ax3.grid(True)
 
         # Plot for average fail history
-        fail_values = np.array(self.avg_fail_history[:, 0])
+        fail_values = np.array(self.avg_fail_history)[:, 0]
         ax4 = fig.add_subplot(gs[1, 1])
         ax4.plot(fail_values, label='Average Fail', color='purple', marker='o')
         ax4.set_title('Average Fail History')
@@ -182,24 +194,39 @@ class Monitor():
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig(learning_config['result_plot_path'])
 
-    def update(self, time_epoch, energy_epoch, reward_epoch, loss_epoch, fail_epoch, usage_epoch, num_episodes,
-               path_job,device_usuage):
 
+    def update(self, time_epoch, energy_epoch, reward_epoch, loss_epoch, fail_epoch, usage_epoch, num_episodes, path_job, device_usage):
+        
+        # Calculate averages
         avg_time = time_epoch / num_episodes
         avg_energy = energy_epoch / num_episodes
         avg_reward = reward_epoch / num_episodes
         avg_loss = loss_epoch / num_episodes
         avg_fail = [elem / num_episodes for elem in fail_epoch]
 
-        avg_loss = avg_loss
-        self.avg_loss_history = np.append(self.avg_loss_history, avg_loss)
-        self.avg_reward_history = np.append(self.avg_reward_history, avg_reward)
-        self.avg_time_history = np.append(self.avg_time_history, avg_time)
-        self.avg_energy_history = np.append(self.avg_energy_history, avg_energy)
-        self.avg_fail_history = np.vstack([self.avg_fail_history, avg_fail])
+        # Append the computed averages to the respective histories
+        self.avg_loss_history.append(avg_loss)
+        self.avg_reward_history.append(avg_reward)
+        self.avg_time_history.append(avg_time)
+        self.avg_energy_history.append(avg_energy)
+        
+        # Stack the average fail values as a new row
+        self.avg_fail_history.append(avg_fail)
 
+        # Append the current usage data
         self.iot_usage.append(usage_epoch[0])
         self.mec_usage.append(usage_epoch[1])
         self.cc_usage.append(usage_epoch[2])
+        
+        # Append the path job to the history
         self.path_history.append(path_job)
-        self.device_usage = device_usuage
+        
+        # Update the device usage directly since it replaces the entire list
+        self.device_usage[:] = device_usage
+
+
+
+
+
+
+

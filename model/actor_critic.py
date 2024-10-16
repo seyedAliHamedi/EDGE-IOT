@@ -160,10 +160,10 @@ class ActorCritic(nn.Module):
                 node.logit_optimizer.step()
                 return
 
-            if node.left:
-                update_leaf_nodes(node.left)
-            if node.right:
-                update_leaf_nodes(node.right)
+                if node.left:
+                    update_leaf_nodes(node.left)
+                if node.right:
+                    update_leaf_nodes(node.right)
 
         # Start from the root actor
         actor = self.actor
